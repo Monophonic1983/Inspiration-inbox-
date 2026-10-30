@@ -34,6 +34,10 @@ public final class Thought {
     public var archivedAt: Date?
     /// Prompt and model that produced the result, so results can be re-run.
     public var processorVersion: String?
+    /// Set when the user edits title or cleaned text; re-processing then asks before overwriting.
+    public var userEditedAt: Date?
+    /// Consecutive failed processing attempts (diagnostics only).
+    public var failureCount: Int = 0
 
     public init(rawTranscript: String, audioFileName: String? = nil) {
         self.rawTranscript = rawTranscript

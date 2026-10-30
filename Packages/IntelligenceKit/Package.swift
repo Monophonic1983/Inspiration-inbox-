@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "IntelligenceKit",
-    platforms: [.iOS(.v26), .macOS(.v26)],
+    platforms: [.iOS(.v26)],
     products: [.library(name: "IntelligenceKit", targets: ["IntelligenceKit"])],
     dependencies: [.package(path: "../Persistence"), ],
     targets: [

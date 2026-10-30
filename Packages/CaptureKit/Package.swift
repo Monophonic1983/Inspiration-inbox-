@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "CaptureKit",
-    platforms: [.iOS(.v26), .macOS(.v26)],
+    platforms: [.iOS(.v26)],
     products: [.library(name: "CaptureKit", targets: ["CaptureKit"])],
     dependencies: [.package(path: "../Persistence"), ],
     targets: [

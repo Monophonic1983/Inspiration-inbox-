@@ -4,10 +4,34 @@ jobs:
   packages:
     runs-on: macos-26
     strategy:
+      fail-fast: false
       matrix:
         package: [DesignSystem, Persistence, ModelStore, IntelligenceKit, CaptureKit]
     steps:
       - uses: actions/checkout@v4
-      - name: Test ${{ matrix.package }}
+      - name: Test ${{ matrix.package }} (iOS simulator)
         working-directory: Packages/${{ matrix.package }}
-        run: swift test
+        run: |
+          xcodebuild test -scheme ${{ matrix.package }} \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+  app:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install xcodegen
+      - run: xcodegen generate
+      - name: Build, unit tests and capture-flow UI test
+        run: |
+          xcodebuild test -project InspirationInbox.xcodeproj -scheme InspirationInbox \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES CODE_SIGNING_ALLOWED=NO
+  backend:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install
+      - run: npm test

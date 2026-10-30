@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "Persistence",
-    platforms: [.iOS(.v26), .macOS(.v26)],
+    platforms: [.iOS(.v26)],
     products: [.library(name: "Persistence", targets: ["Persistence"])],
     dependencies: [],
     targets: [
