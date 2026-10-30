@@ -1,0 +1,30 @@
+{"id": "zh-01", "language": "zh", "category": "short", "transcript": "下班回家路上买牛奶", "expected_kind": "task"}
+{"id": "zh-02", "language": "zh", "category": "short", "transcript": "提醒我明天早上给牙医打电话", "expected_kind": "reminder"}
+{"id": "zh-03", "language": "zh", "category": "short", "transcript": "如果引导页只问一个问题会怎么样", "expected_kind": "idea"}
+{"id": "zh-04", "language": "zh", "category": "short", "transcript": "这张发票含税还是不含税", "expected_kind": "question"}
+{"id": "zh-05", "language": "zh", "category": "short", "transcript": "最好的界面就是没有界面，有人这么说过", "expected_kind": "quote"}
+{"id": "zh-06", "language": "zh", "category": "short", "transcript": "散完步之后心情平静了很多", "expected_kind": "journal"}
+{"id": "zh-07", "language": "zh", "category": "long", "transcript": "我最近一直在想那个周报，我觉得我们应该不再每周发了。每周发会逼着我们凑内容，最近四期都显得很单薄。如果改成每月一期，就可以认真写一篇长文，比如采访一位客户，中间再发一些短文。长文的打开率差不多是短文的两倍，所以我觉得质量比频率更重要。", "expected_kind": "idea"}
+{"id": "zh-08", "language": "zh", "category": "long", "transcript": "好的，团建这件事我需要在周五之前订好场地，跟小雅确认人数，问一下餐饮公司有没有素食和无麸质的选项，周一之前把日程发给大家。另外还得有人安排从车站出发的接驳车，我去问问大伟能不能负责。", "expected_kind": "task"}
+{"id": "zh-09", "language": "zh", "category": "long", "transcript": "今天很长但是挺好。早上的站会超时了，然后我花了三个小时排查同步问题，最后发现是时区的错误，有点尴尬。中午和马可吃饭是最开心的，我们聊了他搬去里斯本的事。晚上跑了步，这周第一次感觉脑子真正清醒了。", "expected_kind": "journal"}
+{"id": "zh-10", "language": "zh", "category": "long", "transcript": "我一直在想要不要把解析器开源。一方面可以吸引贡献者、赢得好感，另一方面会把我们的方法暴露给竞争对手，还得维护各种问题。规模跟我们差不多的公司一般怎么做？许可证的选择会明显改变风险吗？", "expected_kind": "question"}
+{"id": "zh-11", "language": "zh", "category": "long", "transcript": "别忘了护照换发需要带旧护照、两张照片和签好字的表格，领事馆的预约在十二号上午十点半。费用要带现金，他们说不收银行卡。要早点出门，因为那附近很难停车。", "expected_kind": "reminder"}
+{"id": "zh-12", "language": "zh", "category": "long", "transcript": "昨晚读到一句话让我印象很深，大意是我们总是高估自己一年能做到的事，又低估十年能做到的事。我想把它贴在桌子上方的墙上，项目进展慢的时候可以提醒我保持耐心。", "expected_kind": "quote"}
+{"id": "zh-13", "language": "zh", "category": "rambling", "transcript": "嗯就是那个，我在想啊，那个应用，是不是可以，呃，有一个主页，就只显示一样东西，就一样，最近的一条想法，然后就没了，不要列表", "expected_kind": "idea"}
+{"id": "zh-14", "language": "zh", "category": "rambling", "transcript": "对了那个，我要，等等我要干嘛来着，哦对，报税的材料，我得把报税的材料收齐，嗯，还有发票，然后，对，月底之前发给会计", "expected_kind": "task"}
+{"id": "zh-15", "language": "zh", "category": "rambling", "transcript": "不知道怎么说，就是，那种日子，也没出什么错，但也不太对劲，你懂吧，我老是看手机，唉，今晚应该早点睡", "expected_kind": "journal"}
+{"id": "zh-16", "language": "zh", "category": "rambling", "transcript": "就是，呃，用那个轻量的模型好一点，还是，我是说，会不会不够准，因为我们就只有，大概，四个G的内存", "expected_kind": "question"}
+{"id": "zh-17", "language": "zh", "category": "rambling", "transcript": "哦对了，趁我还没忘，告诉小山，不对，问一下小山那个，那个合同的事，续约的日期，我记得是三月，反正，问一下小山", "expected_kind": "reminder"}
+{"id": "zh-18", "language": "zh", "category": "rambling", "transcript": "那如果，这个可能有点傻，但是如果笔记每周末自己整理好，就是，没有文件夹，只有一个总结，然后，我也不知道，它挑出最好的几条给你看", "expected_kind": "idea"}
+{"id": "zh-19", "language": "zh", "category": "multi-topic", "transcript": "有三件事。第一，十五号之前续车险。第二，写季度报告的开头。第三，周四去取干洗的衣服。", "expected_kind": "task"}
+{"id": "zh-20", "language": "zh", "category": "multi-topic", "transcript": "两个想法。一，做一档播客，每一期就是向十个陌生人问同一个问题。二，做一个手机游戏，每天只能玩六十秒。", "expected_kind": "idea"}
+{"id": "zh-21", "language": "zh", "category": "multi-topic", "transcript": "明天九点看牙医，中午十二点和艾琳吃饭，还要在五点图书馆关门前把书还掉。", "expected_kind": "reminder"}
+{"id": "zh-22", "language": "zh", "category": "multi-topic", "transcript": "工作还行，演示很顺利。回到家洗碗机又坏了，还跟姐姐打了很长的电话商量假期安排。感觉有点被拉扯得太紧。", "expected_kind": "journal"}
+{"id": "zh-23", "language": "zh", "category": "multi-topic", "transcript": "周一我有两个问题。亚历克斯走了之后账单迁移现在谁负责？我们还打算在大会之前发布仪表盘吗？", "expected_kind": "question"}
+{"id": "zh-24", "language": "zh", "category": "multi-topic", "transcript": "旅行前我要订火车票，查一下酒店的取消政策，问问莉娜想不想一起打车，还要买一个转换插头。", "expected_kind": "task"}
+{"id": "zh-25", "language": "zh", "category": "mixed", "transcript": "提醒我周四之前把 pitch deck 发给 Müller and Sons，还要问一下 Sofía 关于圣保罗办公室参观的事。", "expected_kind": "reminder"}
+{"id": "zh-26", "language": "zh", "category": "mixed", "transcript": "要不我们把这个功能叫做 Kintsugi，就是日本那种用金子修补陶器的工艺，因为它用金色修复破碎的笔记。", "expected_kind": "idea"}
+{"id": "zh-27", "language": "zh", "category": "mixed", "transcript": "下单 PLA 的 3D 打印耗材，白色，两公斤，然后给 Zhang Wei 发邮件问深圳供应商的 quote。", "expected_kind": "task"}
+{"id": "zh-28", "language": "zh", "category": "mixed", "transcript": "今天和爸妈去喝早茶，虾饺特别好吃，我妈一直说慢慢来，我觉得她是在说我的 career anxiety。", "expected_kind": "journal"}
+{"id": "zh-29", "language": "zh", "category": "mixed", "transcript": "Meeting 改到下周二下午三点的话，我们的 sprint review 要不要也跟着挪，还是 keep 在周五？", "expected_kind": "question"}
+{"id": "zh-30", "language": "zh", "category": "mixed", "transcript": "就像我爷爷常说的，千里之行始于足下，a journey of a thousand miles begins with a single step。", "expected_kind": "quote"}

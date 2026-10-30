@@ -1,0 +1,21 @@
+{
+  "version": 0,
+  "models": [
+    {
+      "id": "qwen3.5-2b-4bit",
+      "displayName": "Qwen3.5 2B (4-bit)",
+      "role": "structuring",
+      "license": "Apache-2.0",
+      "minRAMGB": 6,
+      "files": []
+    },
+    {
+      "id": "qwen3.5-4b-4bit",
+      "displayName": "Qwen3.5 4B (4-bit)",
+      "role": "structuring",
+      "license": "Apache-2.0",
+      "minRAMGB": 8,
+      "files": []
+    }
+  ]
+}
