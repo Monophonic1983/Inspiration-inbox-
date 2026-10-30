@@ -1,0 +1,10 @@
+name = "inspiration-inbox-proxy"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+[vars]
+ANTHROPIC_MODEL = "claude-haiku-5-5"
+# "enforce" (default) requires a valid App Attest assertion. "dev" skips it and must never be used in production.
+ATTEST_MODE = "enforce"
+
+# Secrets (never commit):  wrangler secret put ANTHROPIC_API_KEY
