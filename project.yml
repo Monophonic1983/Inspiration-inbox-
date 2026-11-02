@@ -1,0 +1,92 @@
+# Generate the Xcode project on a Mac:  brew install xcodegen && xcodegen generate
+# Replace the bundle id prefix and DEVELOPMENT_TEAM, then fix the iCloud container id in
+# App/Sources/Resources/InspirationInbox.entitlements and App/Sources/Services/AppConfig.swift.
+name: InspirationInbox
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget: { iOS: "26.0" }
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    DEVELOPMENT_TEAM: ""            # set your team id
+    TARGETED_DEVICE_FAMILY: "1"     # iPhone only
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+packages:
+  DesignSystem: { path: Packages/DesignSystem }
+  CaptureKit: { path: Packages/CaptureKit }
+  IntelligenceKit: { path: Packages/IntelligenceKit }
+  Persistence: { path: Packages/Persistence }
+  ModelStore: { path: Packages/ModelStore }
+  # The only third-party dependencies (PRD architecture rules). Pin exact versions in Spike 2 and confirm product names.
+  WhisperKit: { url: https://github.com/argmaxinc/WhisperKit, from: "0.13.0" }
+  MLXExamples: { url: https://github.com/ml-explore/mlx-swift-examples, from: "2.29.1" }
+targets:
+  InspirationInbox:
+    type: application
+    platform: iOS
+    sources:
+      - App/Sources
+      - App/Shared
+    dependencies:
+      - package: DesignSystem
+      - package: CaptureKit
+      - package: IntelligenceKit
+      - package: Persistence
+      - package: ModelStore
+      - package: WhisperKit
+        product: WhisperKit
+      - package: MLXExamples
+        product: MLXLLM
+      - package: MLXExamples
+        product: MLXLMCommon
+      - target: InspirationInboxControls
+    entitlements:
+      path: App/Sources/Resources/InspirationInbox.entitlements
+    info:
+      path: App/Sources/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Inspiration Inbox
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        CFBundleLocalizations: [en, zh-Hans, zh-Hant]
+        NSMicrophoneUsageDescription: Inspiration Inbox records your voice so it can turn what you say into a note. Audio stays on this device.
+        NSSpeechRecognitionUsageDescription: Inspiration Inbox converts your speech to text on this device so you can see your words as you speak.
+        UIBackgroundModes: [remote-notification]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.inspirationinbox
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  InspirationInboxControls:
+    type: app-extension
+    platform: iOS
+    sources:
+      - App/ControlsExtension
+      - App/Shared
+    info:
+      path: App/ControlsExtension/Info.plist
+      properties:
+        CFBundleDisplayName: Capture Thought
+        NSExtension: { NSExtensionPointIdentifier: com.apple.widgetkit-extension }
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.inspirationinbox.controls
+  InspirationInboxTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [App/Tests]
+    dependencies:
+      - target: InspirationInbox
+  InspirationInboxUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [App/UITests]
+    dependencies:
+      - target: InspirationInbox
+schemes:
+  InspirationInbox:
+    build: { targets: { InspirationInbox: all } }
+    test:
+      targets: [InspirationInboxTests, InspirationInboxUITests]
