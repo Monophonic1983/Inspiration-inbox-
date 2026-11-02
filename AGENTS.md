@@ -1,6 +1,6 @@
 # AGENTS.md — Inspiration Inbox
 
-Native iPhone app (Swift 6, SwiftUI, iOS 26, English + Chinese): speak a thought via the Action Button, get a structured note in the Inbox. Source of truth: the PRD & Roadmap doc (https://claude.ai/artifact/LeEeKJeLggGHFDgtvZaQkX). Export it as `PRD.md` in the repo root (pending: Docs export → Markdown).
+Native iPhone app (Swift 6, SwiftUI, iOS 26, English + Chinese): speak a thought via the Action Button, get a structured note in the Inbox. Source of truth: the PRD & Roadmap doc (https://claude.ai/artifact/LeEeKJeLggGHFDgtvZaQkX). Exported to `PRD.md` in the repo root. The newer interactive design (card model) is in `docs/prototype/`; where the two differ, see `docs/prototype/README.md`.
 
 ## Rules
 - Read PRD.md and this file at the start of every session. Update this file when a decision changes.

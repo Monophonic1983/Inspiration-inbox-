@@ -1,0 +1,1109 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body><title>Inspiration Inbox Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<style>
+/* Instrument-panel look. Layout: a raised home panel over a side drawer (Inbox, Calendar, Todos, Organize, Settings).
+   Type: IBM Plex Sans (light for titles, regular for content) and IBM Plex Mono for labels, values and time.
+   Waveform: dense 1px verticals, bottom-anchored, fading at the top and sides. Colour: pure white or black, flat neutral surfaces, purple as the only accent. */
+:root {
+  --stage: #DADADF; --bg: #FFFFFF; --drawer: #F4F3F8; --card: #F3F3F5; --card2: #E9E9ED; --line: rgba(10,10,20,.1);
+  --ink: #0A0A0C; --ink2: #6A6A72; --ink3: #A3A3AB; --acc: #7C3AED; --on-acc: #FFFFFF; --hot: #C026D3; --grid: rgba(20,10,60,.06);
+  --sans: "IBM Plex Sans", "Noto Sans SC", -apple-system, "PingFang SC", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, "Noto Sans SC", monospace;
+  --ease: cubic-bezier(.2,.8,.2,1); --r: 0px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --stage: #202024; --bg: #000000; --drawer: #060607; --card: #141414; --card2: #1E1E1E; --line: rgba(255,255,255,.09);
+    --ink: #EDEDED; --ink2: #8D8D94; --ink3: #5B5B62; --acc: #A78BFA; --on-acc: #12062B; --hot: #E879F9; --grid: rgba(255,255,255,.05); color-scheme: dark; }
+}
+:root[data-theme="dark"] { --stage: #202024; --bg: #000000; --drawer: #060607; --card: #141414; --card2: #1E1E1E; --line: rgba(255,255,255,.09);
+  --ink: #EDEDED; --ink2: #8D8D94; --ink3: #5B5B62; --acc: #A78BFA; --on-acc: #12062B; --hot: #E879F9; --grid: rgba(255,255,255,.05); color-scheme: dark; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 16px/1.5 var(--sans); overflow: hidden; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, [contenteditable]:focus-visible { outline: 1.5px solid var(--acc); outline-offset: 3px; border-radius: var(--r); }
+.mono { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink2); font-weight: 400; }
+#stage { height: 100%; display: grid; place-items: center; background: var(--bg); }
+#phone { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--drawer); }
+#sbar { display: none; }
+@media (min-width: 560px) {
+  #stage { background: var(--stage); }
+  #phone { width: 390px; height: min(844px, 100%); border-radius: 50px; box-shadow: 0 0 0 9px #0A0A0B, 0 0 0 10px rgba(255,255,255,.1), 0 40px 90px rgba(0,0,0,.4); }
+  #sbar { display: flex; position: absolute; top: 0; left: 0; right: 0; height: 48px; justify-content: space-between; align-items: flex-end; padding: 0 32px 6px; font: 500 12px var(--mono); z-index: 90; pointer-events: none; }
+}
+
+/* drawer */
+#drawer { position: absolute; inset: 0; padding: calc(20px + env(safe-area-inset-top, 0px)) 28px calc(22px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; background: var(--drawer); background-image: radial-gradient(var(--grid) 1px, transparent 1px); background-size: 14px 14px; }
+@media (min-width: 560px) { #drawer { padding-top: 64px; } }
+.brand { align-self: flex-start; padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-bottom: 36px; }
+.dnav { display: flex; flex-direction: column; gap: 2px; }
+.ditem { display: flex; align-items: center; height: 58px; width: 236px; font: 300 32px/1 var(--sans); letter-spacing: -.02em; color: var(--ink3); transition: color .25s, transform .4s var(--ease); position: relative; }
+.ditem[aria-current="true"] { color: var(--ink); }
+.ditem[aria-current="true"]::before { content: ""; position: absolute; left: -16px; top: 21px; width: 6px; height: 6px; background: var(--acc); }
+.ditem .n { font: 400 11px var(--mono); letter-spacing: .1em; color: var(--ink3); margin-left: auto; align-self: center; }
+.dfoot { margin-top: auto; display: flex; flex-direction: column; gap: 14px; }
+#phone:not(.dopen) .ditem { transform: translateX(-14px); }
+
+/* home panel */
+#home { position: absolute; inset: 0; background: var(--bg); overflow: hidden; transform-origin: left center; touch-action: pan-y; will-change: transform;
+  transform: translateX(calc(var(--d, 0) * 296px)) scale(calc(1 - var(--d, 0) * .09)); border-radius: calc(var(--d, 0) * 6px);
+  box-shadow: 0 0 0 1px rgba(128,128,150,calc(var(--d, 0) * .25)), -30px 0 60px rgba(0,0,0,calc(var(--d, 0) * .35)); transition: transform .45s var(--ease), border-radius .45s var(--ease), box-shadow .45s; }
+#home.drag { transition: none; } #phone.dopen #home { --d: 1; }
+#shade { position: absolute; inset: 0; z-index: 25; display: none; } #phone.dopen #shade { display: block; }
+.topbar { position: absolute; top: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: calc(10px + env(safe-area-inset-top, 0px)) 8px 0; background: linear-gradient(var(--bg) 72%, transparent); height: calc(66px + env(safe-area-inset-top, 0px)); }
+@media (min-width: 560px) { .topbar { padding-top: 54px; height: 100px; } }
+.iconbtn { width: 48px; height: 48px; display: grid; place-items: center; border-radius: var(--r); }
+.burger i { display: block; width: 18px; height: 1.5px; background: var(--ink); margin: 3px 0; } .burger i:last-child { width: 11px; }
+.view { position: absolute; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: calc(66px + env(safe-area-inset-top, 0px)) 0 130px; }
+@media (min-width: 560px) { .view { padding-top: 104px; } }
+.hero { padding: 6px 20px 16px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.hero h1 { margin: 0; font: 300 40px/1.1 var(--sans); letter-spacing: -.025em; min-width: 0; }
+.hero .code { font: 400 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink2); white-space: nowrap; }
+.sec { padding: 18px 20px 8px; display: flex; justify-content: space-between; align-items: center; }
+.kv { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 20px; font: 400 15px var(--mono); letter-spacing: .01em; }
+.kv b { font-weight: 400; } .kv .hi { color: var(--acc); }
+.opt2 { display: flex; align-items: center; gap: 14px; width: 100%; padding: 9px 20px; min-height: 44px; font: 400 14px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink2); }
+.opt2 .bx { width: 15px; height: 15px; border: 1px solid var(--ink3); display: grid; place-items: center; flex: none; }
+.opt2[aria-pressed="true"] { color: var(--ink); } .opt2[aria-pressed="true"] .bx { border-color: var(--acc); } .opt2[aria-pressed="true"] .bx::after { content: ""; width: 7px; height: 7px; background: var(--acc); }
+.opt2 .ct { margin-left: auto; color: var(--ink3); letter-spacing: .04em; }
+
+/* cards: flat, light type, striped waveform */
+.cards { padding: 0 16px; display: flex; flex-direction: column; gap: 10px; }
+.row { position: relative; border-radius: var(--r); touch-action: pan-y; max-height: 300px; transition: opacity .3s, max-height .35s ease; }
+.row .bg { position: absolute; inset: 0; border-radius: var(--r); display: flex; align-items: center; padding: 0 22px; font: 400 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; opacity: var(--p, 0); }
+.row[data-dir="r"] .bg { background: var(--acc); color: var(--on-acc); } .row[data-dir="l"] .bg { background: var(--card2); color: var(--ink2); justify-content: flex-end; }
+.card { position: relative; display: block; width: 100%; border-radius: var(--r); padding: 18px 18px 16px; background: var(--card); transition: transform .35s var(--ease); }
+.card.dash { background: none; box-shadow: inset 0 0 0 1px var(--line); }
+.card .top { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; }
+.card .ttl { font: 400 19px/1.3 var(--sans); letter-spacing: -.01em; text-wrap: balance; }
+.card .meta { margin-top: 8px; display: flex; gap: 8px; align-items: center; } .card .meta i { width: 5px; height: 5px; background: var(--acc); }
+.dur { font: 400 12px var(--mono); letter-spacing: .06em; color: var(--ink2); flex: none; padding-top: 4px; }
+.mini { display: flex; align-items: flex-end; gap: 2px; height: 26px; margin-top: 16px; -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent); mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent); }
+.mini i { flex: 1; min-width: 1px; background: linear-gradient(to top, var(--ink2), transparent); }
+.pulse { animation: pulse 1.5s ease-in-out infinite; } @keyframes pulse { 50% { opacity: .35; } }
+.empty { padding: 20px; color: var(--ink2); font-size: 15px; max-width: 32ch; }
+
+/* dock (home) and pills */
+#dock { position: absolute; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 12; height: 68px; border-radius: var(--r); padding: 8px 8px 8px 20px; display: flex; align-items: center; gap: 12px; background: var(--card); box-shadow: 0 0 0 1px var(--line), 0 14px 40px rgba(0,0,0,.18); transition: transform .3s var(--ease), opacity .3s; }
+#dock.hide { opacity: 0; pointer-events: none; transform: translateY(20px); }
+#dockType { flex: 1; min-width: 0; height: 52px; color: var(--ink3); font: 400 16px var(--sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.micico { width: 20px; height: 20px; color: var(--ink2); flex: none; } .micico * { stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.pill { height: 52px; padding: 0 22px; border-radius: var(--r); background: var(--ink); color: var(--bg); font: 500 15px var(--sans); display: inline-flex; align-items: center; gap: 10px; flex: none; }
+.pill.acc { background: var(--acc); color: var(--on-acc); }
+.pill .sq { width: 11px; height: 11px; background: currentColor; display: block; } .pill .rd { width: 9px; height: 9px; border-radius: var(--r); background: currentColor; display: block; }
+
+/* calendar: thermal heat map */
+.ov { padding: 0 20px 6px; } .ov .mlabels { position: relative; height: 14px; margin-bottom: 4px; }
+.ov .mlabels span { position: absolute; top: 0; font: 400 9.5px var(--mono); letter-spacing: .06em; color: var(--ink3); white-space: nowrap; text-transform: uppercase; }
+.strip { display: flex; gap: 3px; } .strip .col { display: flex; flex-direction: column; gap: 3px; }
+.strip button, .strip i { width: 12px; height: 12px; border-radius: var(--r); display: block; } .strip i { visibility: hidden; }
+.h0 { background: var(--card2); }
+.h1 { background: color-mix(in srgb, var(--acc) 26%, var(--card2)); }
+.h2 { background: color-mix(in srgb, var(--acc) 58%, var(--card2)); }
+.h3 { background: var(--acc); }
+.h4 { background: color-mix(in srgb, var(--hot) 70%, var(--acc)); }
+.sel { box-shadow: 0 0 0 1.5px var(--ink); }
+.calnav { display: flex; align-items: center; justify-content: space-between; padding: 18px 12px 8px 20px; }
+.calnav b { font: 300 22px var(--sans); letter-spacing: -.01em; } .calnav .nb { display: flex; gap: 2px; align-items: center; }
+.calnav .nb button { width: 44px; height: 44px; display: grid; place-items: center; border-radius: var(--r); font: 400 18px var(--mono); }
+.dow, .grid7 { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; padding: 0 16px; } .dow { padding-bottom: 6px; }
+.dow span { text-align: center; font: 400 10px var(--mono); letter-spacing: .08em; color: var(--ink3); text-transform: uppercase; }
+.day { aspect-ratio: 1; border-radius: var(--r); padding: 6px 7px; font: 400 11.5px var(--mono); color: var(--ink2); display: flex; align-items: flex-start; justify-content: space-between; position: relative; }
+.day.h3, .day.h4 { color: var(--on-acc); } .day.out { visibility: hidden; }
+.day.today::after { content: ""; position: absolute; right: 6px; top: 7px; width: 4px; height: 4px; background: currentColor; }
+.day .c { font-size: 9px; opacity: .85; align-self: flex-end; }
+.cmap { padding: 16px 20px 0; } .cmap .bar { height: 10px; border-radius: var(--r); background: linear-gradient(90deg, var(--card2), color-mix(in srgb, var(--acc) 40%, var(--card2)), var(--acc), var(--hot)); }
+.cmap .lab { display: flex; justify-content: space-between; margin-top: 6px; font: 400 10px var(--mono); letter-spacing: .08em; color: var(--ink3); }
+.dayhead { padding: 22px 20px 12px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 12px; } .dayhead b { font: 300 22px var(--sans); letter-spacing: -.01em; }
+.readout { background: var(--ink); color: var(--bg); font: 500 10.5px var(--mono); letter-spacing: .04em; padding: 5px 9px; white-space: nowrap; } .readout i { font-style: normal; opacity: .55; }
+.find { margin: 14px 16px 14px; height: 44px; border-radius: var(--r); background: var(--card); display: flex; align-items: center; gap: 10px; padding: 0 14px; }
+.find input { flex: 1; min-width: 0; background: none; border: 0; color: var(--ink); font: 400 15px var(--sans); outline-offset: 8px; } .find input::placeholder { color: var(--ink3); }
+
+/* todos + shared controls */
+.group { margin: 0 16px 10px; padding: 16px 18px 6px; border-radius: var(--r); background: var(--card); }
+.group .src { display: block; width: 100%; font: 400 17px/1.3 var(--sans); margin-bottom: 6px; }
+.task { display: flex; gap: 14px; align-items: flex-start; width: 100%; min-height: 46px; padding: 11px 0; border-top: 1px solid var(--line); }
+.ck { width: 15px; height: 15px; margin-top: 3px; border: 1px solid var(--ink3); flex: none; display: grid; place-items: center; }
+.task.done .ck { border-color: var(--acc); } .task.done .ck::after { content: ""; width: 7px; height: 7px; background: var(--acc); }
+.task.done .tt { color: var(--ink3); text-decoration: line-through; }
+.seg { display: inline-flex; padding: 3px; border-radius: var(--r); background: var(--card); } .seg button { height: 34px; min-width: 56px; padding: 0 12px; border-radius: var(--r); font: 400 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink2); text-align: center; white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.btn { height: 36px; padding: 0 14px; border-radius: var(--r); box-shadow: inset 0 0 0 1px var(--line); font: 400 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; text-align: center; white-space: nowrap; }
+.btn.solid { background: var(--acc); box-shadow: none; color: var(--on-acc); }
+
+/* wave card + panel (thought and capture) */
+.screen { position: absolute; inset: 0; background: var(--bg); z-index: 40; }
+#thought { transform: translateX(100%); transition: transform .45s var(--ease); overflow-y: auto; } #thought.open { transform: none; }
+.screen .pad { padding: calc(10px + env(safe-area-inset-top, 0px)) 0 60px; } @media (min-width: 560px) { .screen .pad { padding-top: 50px; } }
+.tbar { display: flex; justify-content: space-between; padding: 0 8px; } .tpad { padding: 6px 16px 0; }
+.wavecard { position: relative; height: 200px; border-radius: var(--r); background: var(--card); overflow: hidden; }
+.wavecard canvas { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 150px; display: block; touch-action: none; cursor: pointer; }
+.wtop { position: absolute; left: 20px; right: 20px; top: 18px; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; }
+.stat { display: inline-flex; align-items: center; gap: 8px; font: 400 14px var(--sans); color: var(--ink2); } .stat i { width: 6px; height: 6px; border-radius: var(--r); background: var(--acc); }
+.tchip { font: 400 13px var(--mono); letter-spacing: .04em; color: var(--ink2); }
+.play { position: absolute; left: 14px; top: 12px; width: 40px; height: 40px; border-radius: var(--r); background: var(--ink); display: grid; place-items: center; } .play svg { width: 15px; height: 15px; fill: var(--bg); } .wavecard.pl .wtop { padding-left: 46px; align-items: center; top: 12px; height: 40px; }
+.cd { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--acc); width: 100%; transform-origin: left; transform: scaleX(0); }
+.panel { margin-top: 8px; border-radius: var(--r); background: var(--card); padding: 22px 20px 12px; }
+.t1 { font: 300 26px/1.2 var(--sans); letter-spacing: -.02em; outline: none; text-wrap: balance; margin: 0 0 6px; }
+.dmeta { margin-bottom: 14px; }
+.tagrow { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+.tg { height: 30px; padding: 0 12px; border-radius: var(--r); box-shadow: inset 0 0 0 1px var(--line); font: 400 11px var(--mono); letter-spacing: .06em; display: inline-flex; align-items: center; color: var(--ink2); }
+.tg.type { background: var(--acc); box-shadow: none; color: var(--on-acc); } .tg.add { box-shadow: inset 0 0 0 1px var(--ink3); border-radius: var(--r); color: var(--ink3); }
+.tabs { display: flex; gap: 22px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+.tabs button { height: 44px; font: 400 15px var(--sans); color: var(--ink3); position: relative; } .tabs button[aria-selected="true"] { color: var(--ink); }
+.tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--acc); }
+.prose { padding: 16px 0 14px; font: 400 17px/1.7 var(--sans); outline: none; white-space: pre-wrap; }
+.ln { display: block; width: 100%; padding: 14px 0 6px; text-align: left; } .ln .ts { display: flex; gap: 10px; align-items: center; font: 400 13px var(--mono); color: var(--ink2); margin-bottom: 4px; } .ln .ts i { width: 5px; height: 5px; border-radius: var(--r); background: var(--ink3); }
+.ln p { margin: 0; font: 400 16px/1.55 var(--sans); } .ln.on .ts { color: var(--acc); } .ln.on .ts i { background: var(--acc); }
+.todos { padding: 6px 0 4px; }
+
+/* capture */
+#capture { z-index: 60; display: flex; flex-direction: column; opacity: 0; pointer-events: none; transition: opacity .3s; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 0; background-image: radial-gradient(var(--grid) 1px, transparent 1px); background-size: 14px 14px; }
+@media (min-width: 560px) { #capture { padding-top: 56px; } }
+#capture.on { opacity: 1; pointer-events: auto; }
+#capture .wavecard { height: 230px; flex: none; } #capture .wavecard canvas { height: 170px; cursor: default; }
+#capture .panel { flex: 1; min-height: 0; margin-top: 8px; display: flex; flex-direction: column; overflow: hidden; }
+#tx { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+#tx .ph { color: var(--ink3); font-size: 17px; }
+.bar2 { flex: none; margin: 8px 0 calc(16px + env(safe-area-inset-bottom, 0px)); height: 68px; border-radius: var(--r); background: var(--card); padding: 8px 8px 8px 20px; display: flex; align-items: center; gap: 12px; }
+.bar2 input { flex: 1; min-width: 0; background: none; border: 0; color: var(--ink); font: 400 16px var(--sans); height: 52px; } .bar2 input::placeholder { color: var(--ink3); }
+.crystal { position: fixed; z-index: 120; border-radius: var(--r); background: var(--card2); transition: left .6s var(--ease), top .6s var(--ease), width .6s var(--ease), height .6s var(--ease), opacity .3s; }
+
+/* settings: flat rows with hairlines */
+.sg { margin: 0 0 8px; } .sg > .mono { padding: 14px 20px 6px; display: block; }
+.srow { display: flex; justify-content: space-between; align-items: center; gap: 14px; min-height: 56px; padding: 8px 20px; font-size: 16px; border-top: 1px solid var(--line); }
+.srow > span:first-child { min-width: 0; } .srow small { display: block; color: var(--ink2); font-size: 12.5px; line-height: 1.4; }
+.sw { width: 42px; height: 24px; border-radius: var(--r); box-shadow: inset 0 0 0 1px var(--ink3); position: relative; flex: none; transition: background .25s; }
+.sw::after { content: ""; position: absolute; top: 5px; left: 5px; width: 14px; height: 14px; border-radius: var(--r); background: var(--ink3); transition: transform .3s var(--ease), background .25s; }
+.sw[aria-checked="true"] { background: var(--acc); box-shadow: none; } .sw[aria-checked="true"]::after { transform: translateX(18px); background: var(--on-acc); }
+.step { display: inline-flex; align-items: center; gap: 4px; } .step button { width: 40px; height: 36px; border-radius: var(--r); background: var(--card); font: 400 16px var(--mono); text-align: center; } .step b { min-width: 58px; text-align: center; font: 400 13px var(--mono); }
+.bar { height: 2px; background: var(--line); margin: 0 0 10px; } .bar i { display: block; height: 100%; width: 0; background: var(--acc); transition: width .2s linear; }
+.note { color: var(--ink2); font-size: 12.5px; line-height: 1.5; padding: 10px 20px 0; }
+
+/* sheets, tags and rules, toast */
+.scrim { position: absolute; inset: 0; z-index: 100; background: rgba(0,0,0,.5); opacity: 0; pointer-events: none; transition: opacity .25s; } .scrim.on { opacity: 1; pointer-events: auto; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 101; background: var(--bg); box-shadow: 0 -1px 0 var(--line); border-radius: var(--r); transform: translateY(105%); transition: transform .45s var(--ease); padding: 20px 20px calc(22px + env(safe-area-inset-bottom, 0px)); max-height: 86%; overflow-y: auto; }
+.sheet.on { transform: none; } .sheet h2 { margin: 0 0 14px; display: flex; justify-content: space-between; align-items: center; }
+.sheet .blk { margin-bottom: 20px; } .sheet .blk > .mono { display: block; margin-bottom: 10px; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.opt { height: 38px; padding: 0 14px; border-radius: var(--r); background: var(--card); font: 400 12px var(--mono); letter-spacing: .04em; display: inline-flex; align-items: center; gap: 8px; }
+.opt[aria-pressed="true"] { background: var(--acc); color: var(--on-acc); } .opt .x { opacity: .6; font-size: 15px; line-height: 1; margin-left: 2px; padding: 8px 2px; }
+.field { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+.field input, .field select { flex: 1; min-width: 0; height: 44px; border-radius: var(--r); border: 0; background: var(--card); color: var(--ink); padding: 0 12px; font: 400 15px var(--sans); }
+.rule { display: flex; align-items: center; gap: 10px; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14.5px; } .rule em { font: normal 400 12.5px var(--mono); color: var(--acc); } .rule .rx { color: var(--ink3); width: 36px; height: 36px; text-align: center; font-size: 18px; }
+textarea#typedtx { width: 100%; height: 140px; border: 0; border-bottom: 1px solid var(--line); background: none; padding: 6px 0; font: 400 17px/1.6 var(--sans); color: var(--ink); resize: none; }
+.shl { display: block; width: 100%; min-height: 52px; padding: 14px 0; border-top: 1px solid var(--line); font-size: 16px; }
+#toast { position: absolute; left: 16px; right: 16px; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); z-index: 110; border-radius: var(--r); background: var(--ink); color: var(--bg); display: flex; align-items: center; justify-content: space-between; padding: 0 6px 0 16px; min-height: 48px; font: 400 11.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; transform: translateY(calc(100% + 200px)); visibility: hidden; transition: transform .4s var(--ease), visibility 0s .4s; }
+#toast.on { transform: none; visibility: visible; transition: transform .4s var(--ease), visibility 0s; }
+#toast button { min-width: 56px; height: 44px; font: 500 11.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--acc); text-align: center; }
+@media (prefers-reduced-motion: reduce) { .pulse { animation: none; } #home, .card, #thought, .sheet, .row { transition-duration: .01s; } }
+
+/* feed, filters, suggestion */
+.modebar { padding: 0 16px 12px; display: flex; gap: 10px; align-items: center; } .find2 { flex: 1; min-width: 0; height: 40px; background: var(--card); display: flex; align-items: center; gap: 8px; padding: 0 12px; } .find2 input { flex: 1; min-width: 0; background: none; border: 0; color: var(--ink); font: 400 15px var(--sans); outline-offset: 8px; } .find2 input::placeholder { color: var(--ink3); }
+.fcs { display: flex; gap: 6px; overflow-x: auto; padding: 4px 16px 12px; scrollbar-width: none; align-items: center; } .fcs::-webkit-scrollbar { display: none; }
+.fc { flex: none; height: 36px; padding: 0 12px; background: var(--card); font: 400 11.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink2); display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.fc em { font-style: normal; color: var(--ink3); } .fc[aria-pressed="true"] { background: var(--ink); color: var(--bg); } .fc[aria-pressed="true"] em { color: var(--bg); opacity: .6; }
+.fcs .div { flex: none; width: 1px; height: 20px; background: var(--line); margin: 0 4px; } .fc.new { background: none; box-shadow: inset 0 0 0 1px var(--line); color: var(--ink3); }
+.sugg { margin: 4px 16px 14px; padding: 14px 16px; box-shadow: inset 0 0 0 1px var(--acc); background: color-mix(in srgb, var(--acc) 8%, transparent); }
+.sugg p { margin: 6px 0 12px; font: 400 15px/1.5 var(--sans); } .sugg .acts { display: flex; gap: 8px; }
+.dgroup { padding: 18px 20px 8px; display: flex; justify-content: space-between; }
+.feed .cards { padding-bottom: 4px; }
+.qt { display: inline-flex; align-items: center; gap: 8px; min-height: 30px; padding-right: 10px; cursor: pointer; }
+.qt b { font: 400 10.5px var(--mono); color: var(--acc); letter-spacing: .08em; font-weight: 400; }
+.more { margin: 14px 16px 0; width: calc(100% - 32px); height: 44px; box-shadow: inset 0 0 0 1px var(--line); text-align: center; font: 400 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink2); }
+.todolbl { margin: 20px 0 2px; }
+
+/* v7 additions: one job per page */
+.trow { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; min-height: 54px; padding: 12px 20px; font: 400 18px var(--sans); border-top: 1px solid var(--line); }
+.trow .ct { font: 400 12px var(--mono); letter-spacing: .06em; color: var(--ink3); }
+.sbox2 { margin: 0 16px 6px; height: 48px; background: var(--card); display: flex; align-items: center; gap: 10px; padding: 0 14px; }
+.sbox2 input { flex: 1; min-width: 0; background: none; border: 0; color: var(--ink); font: 400 17px var(--sans); outline-offset: 8px; } .sbox2 input::placeholder { color: var(--ink3); }
+.pill.wide { flex: 1; justify-content: center; height: 64px; font-size: 17px; }
+.bar2 { background: none; padding: 0; height: auto; }
+.hero .arrows { display: flex; gap: 2px; margin-bottom: -6px; } .hero .arrows button { width: 44px; height: 44px; display: grid; place-items: center; font: 400 20px var(--mono); }
+.dayhead { padding: 20px 20px 10px; } .dayhead b { font: 300 20px var(--sans); }
+#btnSearch svg { width: 20px; height: 20px; } #btnSearch svg *, #menu svg * { stroke: var(--ink); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.ditem .n { font-size: 12px; }
+
+/* v8: cards, review, threads */
+.card .bod { margin-top: 6px; font: 400 14.5px/1.5 var(--sans); color: var(--ink2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card .thr { color: var(--acc); font: 400 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.card .meta { margin-top: 10px; min-height: 14px; }
+.review { position: absolute; inset: 0; z-index: 70; background: var(--bg); transform: translateY(100%); transition: transform .45s var(--ease); overflow-y: auto; }
+.review.on { transform: none; }
+.review .pad { padding: calc(10px + env(safe-area-inset-top, 0px)) 0 110px; } @media (min-width: 560px) { .review .pad { padding-top: 50px; } }
+.rvc { margin: 0 16px 10px; background: var(--card); padding: 16px 16px 8px; }
+.rvt { font: 400 19px/1.35 var(--sans); outline: none; letter-spacing: -.01em; }
+.rvb { margin-top: 6px; font: 400 14.5px/1.5 var(--sans); color: var(--ink2); outline: none; min-height: 1px; }
+.rvb:empty::before { content: attr(data-ph); color: var(--ink3); }
+.rvf { display: flex; align-items: center; gap: 4px; margin-top: 12px; border-top: 1px solid var(--line); padding-top: 4px; flex-wrap: wrap; }
+.rvf .sp { flex: 1; }
+.act { height: 40px; padding: 0 10px; font: 400 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink2); }
+.chip2 { height: 32px; padding: 0 10px; font: 400 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; display: inline-flex; align-items: center; gap: 6px; background: var(--acc); color: var(--on-acc); }
+.chip2.sug { background: none; box-shadow: inset 0 0 0 1px var(--acc); color: var(--acc); } .chip2.none { background: none; box-shadow: inset 0 0 0 1px var(--line); color: var(--ink3); }
+.rvbar { position: fixed; left: 0; right: 0; bottom: 0; }
+.rvfoot { position: absolute; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 3; display: flex; gap: 8px; }
+.skel { margin: 0 16px 10px; height: 92px; background: var(--card); position: relative; overflow: hidden; } .skel::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(128,128,150,.18) 50%, transparent 70%); transform: translateX(-100%); animation: shim 1.6s ease-in-out infinite; } @keyframes shim { to { transform: translateX(100%); } }
+.trow .sub { display: block; font: 400 14px/1.4 var(--sans); color: var(--ink2); margin-top: 2px; max-width: 270px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.chain { margin: 0 16px; border-left: 1px solid var(--line); padding-left: 14px; } .chain .dgroup { padding: 14px 0 6px; }
+.orig { font: 400 15px/1.6 var(--sans); color: var(--ink2); margin: 0 0 18px; }
+.srcrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+.cardrow { display: block; width: 100%; text-align: left; padding: 14px 0; border-top: 1px solid var(--line); font: 400 16px/1.45 var(--sans); }
+.badge { color: var(--acc); font: 400 10.5px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+
+/* v9: docked bar, card page order, markdown, organize, patterns */
+#dock { left: 0; right: 0; bottom: 0; height: calc(64px + env(safe-area-inset-bottom, 0px)); padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px)) 20px; background: var(--bg); box-shadow: none; border-top: 1px solid var(--line); }
+#dock .pill { height: 48px; padding: 0 20px; }
+#dockType { height: 48px; }
+.view { padding-bottom: 96px; }
+#toast { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+.card .ttl { font: 400 20px/1.3 var(--sans); }
+.card .meta { margin-top: 10px; }
+.card .meta .ty { color: var(--ink2); } .card .meta .tgs { color: var(--acc); margin-left: 4px; }
+.hl { font: 300 32px/1.2 var(--sans); letter-spacing: -.025em; outline: none; margin: 0 0 14px; text-wrap: balance; }
+.cpanel { padding: 4px 4px 0; }
+.md { font: 400 17px/1.7 var(--sans); } .md p { margin: 0 0 10px; } .md h1, .md h2, .md h3 { font-weight: 500; margin: 14px 0 6px; letter-spacing: -.01em; line-height: 1.3; } .md h1 { font-size: 22px; } .md h2 { font-size: 19px; } .md h3 { font-size: 17px; }
+.md ul, .md ol { margin: 0 0 10px; padding-left: 22px; } .md li { margin: 2px 0; } .md blockquote { margin: 0 0 10px; padding-left: 12px; border-left: 2px solid var(--acc); color: var(--ink2); }
+.md code { font: 400 14px var(--mono); background: var(--card2); padding: 1px 5px; } .md a { color: var(--acc); } .md .wl { color: var(--acc); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; } .md .wl.miss { color: var(--ink3); text-decoration: none; }
+.md input[type=checkbox] { accent-color: var(--acc); margin-right: 8px; }
+.mdhint { color: var(--ink3); font: 400 15px var(--sans); padding: 6px 0 14px; cursor: text; }
+.editor textarea { width: 100%; min-height: 120px; background: var(--card2); border: 0; color: var(--ink); font: 400 14.5px/1.6 var(--mono); padding: 12px; resize: vertical; }
+.editor .pv { margin-top: 10px; padding: 12px; box-shadow: inset 0 0 0 1px var(--line); } .editor .pv > .mono { display: block; margin-bottom: 6px; }
+.addon { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 18px; }
+.sec2 { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line); } .sec2 > .mono { display: block; margin-bottom: 4px; }
+.lk { display: flex; gap: 12px; align-items: baseline; width: 100%; text-align: left; padding: 11px 0; border-top: 1px solid var(--line); font: 400 16px/1.4 var(--sans); } .lk .k { flex: none; width: 88px; font: 400 10px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink3); } .lk .x { margin-left: auto; color: var(--ink3); padding: 0 6px; font-size: 16px; }
+.srcbox { margin-top: 24px; padding: 12px; background: var(--card); display: flex; align-items: center; gap: 12px; } .srcbox canvas { flex: 1; height: 44px; min-width: 0; display: block; } .srcbox .play { position: static; width: 40px; height: 40px; flex: none; }
+.srcmeta { margin-top: 8px; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.foot2 { display: flex; gap: 8px; margin-top: 26px; padding-bottom: 30px; }
+.orow { padding: 14px 20px; border-top: 1px solid var(--line); background: none; font: 400 18px var(--sans); display: flex; justify-content: space-between; align-items: center; gap: 12px; } .orow .ct { font: 400 12px var(--mono); color: var(--ink3); letter-spacing: .06em; }
+.card.orow { background: var(--bg); border-radius: 0; }
+.pat { margin: 0 16px 12px; padding: 16px; background: var(--card); } .pat h3 { margin: 6px 0 10px; font: 300 24px/1.25 var(--sans); letter-spacing: -.02em; } .pat .ex { font: 400 15px/1.5 var(--sans); color: var(--ink2); padding: 8px 0; border-top: 1px solid var(--line); } .pat .acts { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.hint2 { margin: 8px 0 14px; padding: 12px; box-shadow: inset 0 0 0 1px var(--acc); font: 400 14px/1.5 var(--sans); } .hint2 .btn { margin-top: 10px; }
+.sheet .field textarea { flex: 1; min-height: 90px; background: var(--card); border: 0; color: var(--ink); font: 400 16px/1.5 var(--sans); padding: 10px; resize: none; }
+.bigopt { display: block; width: 100%; padding: 16px; margin-top: 8px; background: var(--card); font: 400 17px var(--sans); } .bigopt small { display: block; color: var(--ink2); font-size: 13px; margin-top: 2px; } .bigopt.pri { background: var(--acc); color: var(--on-acc); } .bigopt.pri small { color: var(--on-acc); opacity: .75; }
+
+/* v10: Spotify-inspired. Small radii, pill controls, bold type, clear hierarchy. */
+:root { --r: 8px; --sans: "Figtree", "Noto Sans SC", -apple-system, "PingFang SC", system-ui, sans-serif; --card: #F3F3F3; --card2: #E7E7E7; --ink: #121212; --ink2: #5B5B5B; --ink3: #8F8F8F; --line: rgba(0,0,0,.08); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #000000; --drawer: #000000; --card: #181818; --card2: #282828; --ink: #FFFFFF; --ink2: #B3B3B3; --ink3: #727272; --line: rgba(255,255,255,.08); } }
+:root[data-theme="dark"] { --bg: #000000; --drawer: #000000; --card: #181818; --card2: #282828; --ink: #FFFFFF; --ink2: #B3B3B3; --ink3: #727272; --line: rgba(255,255,255,.08); }
+body { font-family: var(--sans); }
+.mono { font-family: var(--sans); font-weight: 600; font-size: 12px; letter-spacing: .01em; text-transform: none; }
+.dur, .tchip, #stime, #clock, .ln .ts, .readout { font-family: "IBM Plex Mono", ui-monospace, monospace !important; }
+.hero { padding: 6px 20px 18px; } .hero h1 { font: 800 32px/1.1 var(--sans); letter-spacing: -.03em; }
+#topLabel { font-weight: 700; font-size: 13px; color: var(--ink); }
+.ditem { font: 700 28px/1 var(--sans) !important; letter-spacing: -.02em; }
+.ditem[aria-current="true"]::before { border-radius: 50%; }
+.brand { font-weight: 700; }
+.dgroup { padding: 22px 20px 10px; } .dgroup span { font: 700 17px var(--sans); color: var(--ink); letter-spacing: -.01em; }
+.cards { gap: 8px; }
+.row, .row .bg { border-radius: 8px; }
+.card { border-radius: 8px; padding: 14px 16px; background: var(--card); }
+.card .ttl { font: 700 16.5px/1.3 var(--sans); letter-spacing: -.01em; }
+.card .bod { font: 400 14px/1.45 var(--sans); color: var(--ink2); margin-top: 4px; }
+.card .meta { margin-top: 8px; font: 500 12.5px var(--sans); letter-spacing: 0; text-transform: none; } .card .meta .ty { color: var(--ink2); } .card .meta .tgs { color: var(--ink3); margin-left: 6px; }
+.btn { border-radius: 999px; font: 700 13px var(--sans); letter-spacing: 0; text-transform: none; padding: 0 16px; height: 36px; }
+.btn.solid { color: var(--on-acc); }
+.pill, .chip2, .opt, .tg, .act, .seg, .fc, .tp { border-radius: 999px; }
+.seg button { border-radius: 999px; font: 700 12.5px var(--sans); letter-spacing: 0; text-transform: none; }
+.opt { font: 600 13px var(--sans); letter-spacing: 0; } .chip2 { font: 700 12px var(--sans); letter-spacing: 0; text-transform: none; }
+.act { font: 600 12.5px var(--sans); letter-spacing: 0; text-transform: none; }
+.sheet { border-radius: 16px 16px 0 0; } .sheet h2 .mono { font-size: 15px; color: var(--ink); }
+.sugg, .rvc, .skel, .wavecard, .panel, .srcbox, .group, .find, .sbox2, .day, .tile { border-radius: 8px; } .strip button { border-radius: 3px; }
+.rvt { font: 700 17px/1.35 var(--sans); }
+.sw { border-radius: 999px; } .sw::after { border-radius: 50%; }
+.play { border-radius: 50% !important; background: var(--acc) !important; } .play svg { fill: var(--on-acc) !important; }
+.stat i, .day.today::after { border-radius: 50%; }
+.pill.acc { font-weight: 700; }
+/* docked bar, Spotify style */
+#dock { gap: 10px; } #dockType { border-radius: 999px; background: var(--card); padding: 0 18px; height: 44px; font: 500 15px var(--sans); }
+#dock .pill { height: 44px; }
+/* organize: big section headings, small entries */
+.sech { margin: 0; font: 800 22px/1.2 var(--sans); letter-spacing: -.02em; color: var(--ink); }
+.sec { padding: 26px 20px 8px; }
+.card.orow, .orow { font: 400 15px var(--sans); padding: 10px 20px; min-height: 44px; border-top: 0; border-radius: 8px; }
+.orow .ct { font: 500 13px var(--sans); color: var(--ink3); letter-spacing: 0; }
+#goarch { font: 600 15px var(--sans); }
+/* card page: the note owns the screen */
+.hl { font: 800 28px/1.15 var(--sans); letter-spacing: -.03em; margin: 4px 0 12px; }
+.cmeta { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 20px; }
+.pillt { height: 28px; padding: 0 12px; border-radius: 999px; background: var(--card2); color: var(--ink); font: 600 12.5px var(--sans); display: inline-flex; align-items: center; }
+.pillt.ty { background: var(--acc); color: var(--on-acc); } .pillt.add { background: none; box-shadow: inset 0 0 0 1px var(--line); color: var(--ink3); min-width: 28px; justify-content: center; padding: 0 10px; }
+.rte { min-height: 42vh; outline: none; font: 400 17px/1.65 var(--sans); color: var(--ink); padding-bottom: 8px; }
+.rte:empty::before { content: attr(data-ph); color: var(--ink3); }
+.rte p, .rte div { margin: 0 0 8px; } .rte h3 { font: 700 20px/1.3 var(--sans); margin: 14px 0 6px; } .rte ul, .rte ol { margin: 0 0 8px; padding-left: 22px; } .rte li { margin: 2px 0; }
+.rte blockquote { margin: 0 0 8px; padding-left: 12px; border-left: 3px solid var(--acc); color: var(--ink2); }
+.rte .wl { color: var(--acc); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font-weight: 600; }
+.rte input[type=checkbox] { accent-color: var(--acc); width: 16px; height: 16px; margin: 0 8px 0 0; transform: translateY(2px); }
+.secondary { margin-top: 28px; display: flex; flex-direction: column; gap: 8px; }
+.secondary > .mono { margin: 0 2px 4px; color: var(--ink3); }
+.acc { background: var(--card); border-radius: 8px; overflow: hidden; }
+.acch { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 0 16px; text-align: left; }
+.acch .al { font: 700 14.5px var(--sans); color: var(--ink); flex: none; } .acch .as { margin-left: auto; color: var(--ink3); font: 500 13px var(--sans); max-width: 58%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chev { width: 16px; height: 16px; flex: none; transition: transform .2s; } .chev path { stroke: var(--ink3); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; } .acc.on .chev { transform: rotate(90deg); }
+.accb { padding: 0 16px 10px; }
+.accb .lk { border-top: 1px solid var(--line); font: 500 14.5px/1.4 var(--sans); padding: 12px 0; } .accb .lk .k { width: 82px; font: 600 11px var(--sans); letter-spacing: .02em; text-transform: none; }
+.accb .srcbox { margin-top: 0; background: var(--card2); } .accb .srcmeta { padding-bottom: 4px; }
+.chain2 { margin-top: 8px; } .chain2 .lk { border-top: 1px solid var(--line); font: 500 15px/1.4 var(--sans); }
+.typednote { margin-top: 4px; color: var(--ink3); font: 500 12.5px var(--sans); padding: 0 2px; }
+#thought .pad { padding-bottom: 120px; }
+.hint2 { border-radius: 8px; }
+/* formatting toolbar */
+.mdbar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 105; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px)); background: var(--card); border-top: 1px solid var(--line); transform: translateY(110%); transition: transform .25s var(--ease); }
+.mdbar::-webkit-scrollbar { display: none; } .mdbar.on { transform: none; }
+.mdbar button { flex: none; min-width: 42px; height: 40px; padding: 0 10px; border-radius: 8px; font: 600 16px var(--sans); color: var(--ink); display: grid; place-items: center; }
+.mdbar button:active { background: var(--card2); } .mdbar svg { width: 20px; height: 20px; } .mdbar svg * { stroke: var(--ink); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.mdbar .sep { flex: none; width: 1px; background: var(--line); margin: 8px 2px; }
+#typed .rte { min-height: 150px; font-size: 17px; padding: 6px 0 12px; border-bottom: 1px solid var(--line); }
+#typed.withbar { padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+.shl.danger { color: #E5484D; } #cardmenu .shl:first-child { border-top: 0; }
+
+/* v10 polish */
+.rte:focus-visible, .hl:focus-visible { outline: none; }
+.rte { min-height: 34vh; } .rte.short { min-height: 0; }
+.mdbar { gap: 0; padding-left: 4px; padding-right: 4px; } .mdbar button { flex: 1 1 0; min-width: 30px; padding: 0 2px; } .mdbar .sep { margin: 8px 1px; }
+.secondary { margin-top: 28px; display: grid; gap: 6px; }
+.acc { border-radius: 8px; }
+.acch { min-height: 44px; padding: 0 14px; } .acch .al { font: 600 13.5px var(--sans); color: var(--ink2); } .acch .as { font: 500 12.5px var(--sans); }
+.acc.on .acch .al { color: var(--ink); }
+.accb .lk { font: 500 14px/1.4 var(--sans); padding: 10px 0; }
+.lk .k { font: 500 12px var(--sans); letter-spacing: 0; text-transform: none; width: 72px; }
+#dock .pill { border-radius: 999px; }
+</style>
+<div id="stage">
+  <div id="phone">
+    <div id="sbar"><span>9:41</span><span>5G · 82%</span></div>
+    <aside id="drawer" aria-label="Menu"><div class="brand mono">Inspiration / Inbox</div><nav class="dnav" id="dnav"></nav><div class="dfoot"><span class="seg" id="dlang" style="align-self:flex-start"></span></div></aside>
+    <div id="home">
+      <div class="topbar"><button class="iconbtn" id="menu"></button><span class="mono" id="topLabel"></span><button class="iconbtn" id="btnSearch" aria-label="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg></button></div>
+      <section class="view" id="v-cards" aria-label="Cards"></section>
+      <section class="view" id="v-organize" aria-label="Organize" hidden></section>
+      <section class="view" id="v-filter" aria-label="Filter" hidden></section>
+      <section class="view" id="v-archive" aria-label="Archive" hidden></section>
+      <section class="view" id="v-patterns" aria-label="Patterns" hidden></section>
+      <section class="view" id="v-cal" aria-label="Calendar" hidden></section>
+      <section class="view" id="v-recs" aria-label="Recordings" hidden></section>
+      <section class="view" id="v-search" aria-label="Search" hidden></section>
+      <section class="view" id="v-settings" aria-label="Settings" hidden></section>
+      <div id="dock"><button id="dockType"></button><button class="pill acc" id="cta"></button></div>
+      <div id="shade"></div>
+    </div>
+    <section class="screen" id="thought" aria-label="Detail"></section>
+    <section class="screen" id="capture" aria-label="Capture">
+      <div class="wavecard"><canvas id="livecv"></canvas><div class="wtop"><span class="stat"><i></i><span id="cstat"></span></span><span class="tchip" id="clock">00:00</span></div><div class="cd" id="cd"></div></div>
+      <div class="panel"><div class="mono" id="ctitle" style="margin-bottom:10px"></div><div id="tx"></div></div>
+      <div class="bar2"><button class="pill wide" id="btnStop"></button></div>
+    </section>
+    <section class="review" id="review" aria-label="Review"></section>
+    <div class="scrim" id="scrim"></div>
+    <div class="sheet" id="typed" role="dialog"><h2><span class="mono" id="typedT"></span><button class="btn solid" id="saveTyped"></button></h2><div class="rte" id="typedtx" contenteditable="true" spellcheck="false" aria-label="Note"></div></div>
+    <div class="sheet" id="ask" role="dialog"></div><div class="sheet" id="sort" role="dialog"></div><div class="sheet" id="linkp" role="dialog"></div><div class="sheet" id="prob" role="dialog"></div>
+    <div class="sheet" id="cardmenu" role="dialog"></div><div class="mdbar" id="mdbar" aria-label="Formatting"></div>
+    <div id="toast" role="status"><span id="toastMsg"></span><button id="toastBtn"></button></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var $ = function (s) { return document.querySelector(s); }, $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
+  var store; try { store = window.localStorage; } catch (e) { store = null; }
+  function rd(k, d) { try { var v = store && store.getItem(k); return v == null ? d : v; } catch (e) { return d; } }
+  function wr(k, v) { try { store && store.setItem(k, v); } catch (e) {} }
+  var navLang = (navigator.language || 'en').toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en';
+  var lang = rd('lang3', navLang), theme = rd('theme3', 'auto');
+  function applyTheme() { if (theme === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = theme; }
+  applyTheme();
+
+  /* ---------- strings ---------- */
+  var T = {
+    zh: { cards: '卡片', organize: '整理', patterns: '规律', cal: '日历', recs: '录音', settings: '设置', search: '搜索', dockPh: '输入想法…', recordB: '录音', stopB: '停止并保存', listening: '录音中', saving: '保存中', quiet: '静音，即将保存', typeTitle: '写下想法', save: '保存', capTitle: '实时转写',
+      today: '今天', yday: '昨天', older: '显示更早的', emptyCards: '还没有卡片。录一段音，系统会拆成一个个清晰的想法。', none: '没有结果', searchPh: '搜索卡片、类型、标签', del: '删除', undo: '撤销', deleted: '已删除', archive: '归档', archived: '已归档', restore: '恢复', restored: '已恢复', back: '返回', play: '播放', playing: '播放中', paused: '已暂停',
+      typesSec: '类型', tagsSec: '标签', archivedRow: '已归档', archiveEmpty: '没有归档的卡片。', staleMsg: function (n) { return n + ' 张卡片超过 60 天没碰过，也没有链接。归档它们，让常用的保持清爽？'; }, archiveThem: '归档这些', archivedOk: '已归档',
+      review: '检查', splitting: '正在拆分…', reviewSub: '请确认拆分是否正确', cardsN: '张卡片', later: '稍后', merge: '与下一张合并', split: '拆分', drop: '丢弃', saveN: '保存', keepOnly: '只保留录音', cantSplit: '无法再拆分了', savedN: '已保存', titlePh: '一句话说清这个想法', bodyPh: '补充（可选，支持 Markdown）', fromText: '来自文字',
+      askT: '要拆成多张卡片吗？', askSplit: '拆成多张卡片', askSplitS: '系统帮你拆分，你来检查', askOne: '保留为一张卡片', askOneS: '原样保存',
+      sortT: '整理', type: '类型', tags: '标签', thread: '主题线', noThread: '无', newType: '新类型', newTag: '新标签', newThread: '新主题线', name: '名称', add: '添加', done: '完成',
+      detail: '补充', editMd: '编辑', preview: '预览', mdHint: '点按添加补充，支持 Markdown 和 [[卡片标题]]', links: '链接', linkCard: '链接另一张卡片', thisThread: '所属主题线', sameRec: '同一段录音', linksTo: '指向', linkedFrom: '被引用', both: '互相', chain: '这条主题线', chainLong: function (n) { return '这条主题线已有 ' + n + ' 张卡片，太长就失去意义了。只保留最近 10 张？'; }, archiveOlder: '归档较早的', src: '来源', openRec: '打开录音', typedOn: '手动输入', origin: '你原话', transcript: '转写', cardsFrom: '这段录音的卡片', noCards: '还没有卡片', needsReview: '待检查', note: '文字',
+      notePh: '写下你的笔记…', recording: '录音', editMeta: '类型和标签', more: '更多', loop: '循环', patEmpty: '暂时没有发现反复出现的主题。', loopTitle: function (kw, n, w) { return '你已经 ' + n + ' 次回到“' + kw + '”，横跨 ' + w + ' 周。'; }, loopQ: '反复出现，往往说明有一个还没说清的问题。', nameProb: '写下真正的问题', notLoop: '不是循环', probTitle: '真正的问题是什么？', probPh: '用一句话写下来', probSaved: '已创建“症结”卡片',
+      sLang: '语言', sLook: '外观', system: '系统', light: '浅色', dark: '深色', sRec: '录音', autostop: '静音后自动停止', secs: ' 秒', keepAudio: '保留录音', off: '不保留', d: '天', sAI: '设备端 AI', modelRow: 'Qwen3.5 2B · 1.3 GB', installed: '已安装', delM: '删除', dl: '下载', sProto: '原型', actionBtn: '模拟操作按钮', reset: '重置示例', langSwitched: '示例已切换为中文',
+      types: { thought: '随想', idea: '点子', epiphany: '顿悟', question: '疑问', project: '项目', thread: '主题线', problem: '症结' } },
+    en: { cards: 'Cards', organize: 'Organize', patterns: 'Patterns', cal: 'Calendar', recs: 'Recordings', settings: 'Settings', search: 'Search', dockPh: 'Type a thought…', recordB: 'Record', stopB: 'Stop and save', listening: 'Listening', saving: 'Saving', quiet: 'Quiet, saving soon', typeTitle: 'Write a thought', save: 'Save', capTitle: 'Live transcript',
+      today: 'Today', yday: 'Yesterday', older: 'Show older', emptyCards: 'No cards yet. Record something and it will be split into clear, single thoughts.', none: 'No results', searchPh: 'Search cards, types, tags', del: 'Delete', undo: 'Undo', deleted: 'Deleted', archive: 'Archive', archived: 'Archived', restore: 'Restore', restored: 'Restored', back: 'Back', play: 'Play', playing: 'Playing', paused: 'Paused',
+      typesSec: 'Types', tagsSec: 'Tags', archivedRow: 'Archived', archiveEmpty: 'No archived cards.', staleMsg: function (n) { return n + ' cards haven’t been touched in 60+ days and have no links. Archive them to keep what’s active relevant?'; }, archiveThem: 'Archive them', archivedOk: 'Archived',
+      review: 'Review', splitting: 'Splitting…', reviewSub: 'Check the split is right', cardsN: 'cards', later: 'Later', merge: 'Merge with next', split: 'Split', drop: 'Drop', saveN: 'Save', keepOnly: 'Keep recording only', cantSplit: 'Can’t split further', savedN: 'saved', titlePh: 'The idea in one sentence', bodyPh: 'Detail (optional, Markdown works)', fromText: 'From text',
+      askT: 'Split into several cards?', askSplit: 'Split into cards', askSplitS: 'The app splits it, you check', askOne: 'Keep as one card', askOneS: 'Save it as written',
+      sortT: 'Sort', type: 'Type', tags: 'Tags', thread: 'Thread', noThread: 'None', newType: 'New type', newTag: 'New tag', newThread: 'New thread', name: 'Name', add: 'Add', done: 'Done',
+      detail: 'Detail', editMd: 'Edit', preview: 'Preview', mdHint: 'Tap to add detail. Markdown and [[Card title]] work.', links: 'Links', linkCard: 'Link another card', thisThread: 'Thread', sameRec: 'Same recording', linksTo: 'Links to', linkedFrom: 'Linked from', both: 'Both ways', chain: 'In this thread', chainLong: function (n) { return 'This thread has ' + n + ' cards. Past a point a thread stops meaning anything. Keep only the latest 10?'; }, archiveOlder: 'Archive older', src: 'Source', openRec: 'Open recording', typedOn: 'Typed', origin: 'Your words', transcript: 'Transcript', cardsFrom: 'Cards from this recording', noCards: 'No cards yet', needsReview: 'Needs review', note: 'Text',
+      notePh: 'Write your note…', recording: 'Recording', editMeta: 'Type and tags', more: 'More', loop: 'Loop', patEmpty: 'No recurring themes found yet.', loopTitle: function (kw, n, w) { return 'You’ve come back to “' + kw + '” ' + n + ' times across ' + w + ' weeks.'; }, loopQ: 'When something keeps returning, there’s usually a problem you haven’t named yet.', nameProb: 'Write the real problem', notLoop: 'Not a loop', probTitle: 'What is the real problem?', probPh: 'In one sentence', probSaved: 'Problem card created',
+      sLang: 'Language', sLook: 'Appearance', system: 'System', light: 'Light', dark: 'Dark', sRec: 'Recording', autostop: 'Auto-stop after silence', secs: ' s', keepAudio: 'Keep audio', off: 'Off', d: 'd', sAI: 'On-device AI', modelRow: 'Qwen3.5 2B · 1.3 GB', installed: 'installed', delM: 'Delete', dl: 'Download', sProto: 'Prototype', actionBtn: 'Simulate Action Button', reset: 'Reset samples', langSwitched: 'Samples switched to English',
+      types: { thought: 'Thought', idea: 'Idea', epiphany: 'Epiphany', question: 'Question', project: 'Project', thread: 'Thread', problem: 'Problem' } }
+  };
+  function t(k) { return T[lang][k]; }
+
+  /* ---------- sample data: real situations, not placeholders ---------- */
+  var DAY = 86400000;
+  function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+  function dkey(ts) { var d = new Date(ts); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function sod(ts) { var d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); }
+  var SPEC = {
+    en: {
+      recs: [
+        { k: 'r1', d: 1, h: 20, dur: 48, raw: 'the home screen should show one thing at a time not a list of everything and the waveform should be the hero because sound is the raw material also the main buttons belong at the bottom where the thumb is' },
+        { k: 'r2', d: 5, h: 9, dur: 35, raw: 'nobody wants to file things so the app should organise by meaning not by folders the recording is only the raw material the card is the product' },
+        { k: 'r3', d: 2, h: 11, dur: 52, raw: 'launch is on March twelfth beta has to be ready by February first the pricing page by February fifteenth and I need the press list built the biggest risk is model memory on older phones' }],
+      threads: [{ k: 'T1', t: 'Voice notes app: design principles', b: 'How the app should look and feel, thought by thought.', d: 0, h: 8 }, { k: 'T2', t: 'March launch', b: 'Everything that has to happen before the 12th.', d: 0, h: 7 }],
+      cards: [
+        { k: 'c1', r: 'r1', at: 0, t: 'The home screen should show one thing at a time', b: 'Not a list of everything.', ty: 'idea', tg: ['product design'], th: 'T1' },
+        { k: 'c2', r: 'r1', at: 16, t: 'The waveform should be the hero', b: 'Sound is the raw material, so it should be what you see first.', ty: 'idea', tg: ['product design', 'aesthetics'], th: 'T1' },
+        { k: 'c3', r: 'r1', at: 34, t: 'Primary buttons belong at the bottom, where the thumb is', b: '', ty: 'idea', tg: ['product design'], th: 'T1' },
+        { k: 'c4', r: 'r2', at: 0, t: 'Nobody wants to file things', b: 'The app should organise by **meaning**, not by folders.', ty: 'epiphany', tg: ['product design'], th: 'T1' },
+        { k: 'c5', r: 'r2', at: 20, t: 'The recording is raw material. The card is the product.', b: '', ty: 'epiphany', tg: ['product design'], th: 'T1', l: ['c2'] },
+        { k: 'c6', r: 'r3', at: 0, t: 'Launch is March 12', b: '- Beta ready by **Feb 1**\n- Pricing page by **Feb 15**\n- Build the press list', ty: 'project', tg: ['launch', 'planning'], th: 'T2' },
+        { k: 'c7', r: 'r3', at: 30, t: 'The biggest risk is model memory on older phones', b: 'Test on the oldest 8 GB device before committing.', ty: 'question', tg: ['launch'], th: 'T2', l: ['c6'] },
+        { k: 'c8', d: 3, h: 22, t: 'The best interfaces feel quiet', b: 'Nothing competes with the one thing that matters.', ty: 'idea', tg: ['aesthetics', 'product design'] },
+        { k: 'c9', d: 7, h: 8, t: 'Ma: empty space is part of the design', b: 'The Japanese idea that the gap is as meaningful as the object. Use it for spacing.', ty: 'idea', tg: ['aesthetics'], l: ['c8'] }],
+      solos: [
+        { d: 8, ty: 'question', tg: ['pricing', 'business'], t: 'Is $9 a month too much for a notes app?' },
+        { d: 15, ty: 'idea', tg: ['pricing'], t: 'Maybe the free tier should be limited to 20 cards' },
+        { d: 23, ty: 'idea', tg: ['pricing', 'business'], t: 'People who pay for notes apps want sync, not AI' },
+        { d: 30, ty: 'epiphany', tg: ['pricing', 'personal growth'], t: 'I keep changing the price in my head: $5, then $9, then free', k: 'cp2', l: ['cp3'] },
+        { d: 41, ty: 'question', tg: ['pricing'], t: 'What if pricing is the wrong thing to worry about before anyone uses it?' },
+        { d: 52, ty: 'question', tg: ['pricing', 'business'], t: 'Should it be a one-time purchase instead of a subscription?' },
+        { d: 60, ty: 'idea', tg: ['pricing'], t: 'Pricing again: ask ten users what they would pay' },
+        { d: 4, ty: 'epiphany', tg: ['personal growth', 'psychology'], t: 'I have not sent the draft because it is not perfect yet' },
+        { d: 11, ty: 'idea', tg: ['psychology', 'product design'], t: 'I rewrote the landing page headline eleven times, chasing perfect' },
+        { d: 19, ty: 'epiphany', tg: ['personal growth', 'psychology'], t: 'Waiting until it is perfect is just fear dressed up', k: 'cp3' },
+        { d: 27, ty: 'idea', tg: ['personal growth'], t: 'Ship the imperfect version and fix it after feedback' },
+        { d: 38, ty: 'question', tg: ['psychology'], t: 'Why do I only feel safe when it is perfect?' }],
+      pool: [['Book the dentist for next week.', 'thought', []], ['Call Dad before Sunday.', 'thought', []], ['Try the new ramen place this weekend.', 'thought', []], ['Stretch for five minutes every hour.', 'idea', ['health']], ['Read the essay about Kintsugi.', 'thought', ['aesthetics']], ['Journal for ten minutes before bed.', 'idea', ['personal growth']], ['Why do I check my phone first thing in the morning?', 'question', ['psychology']], ['Small daily habits compound faster than big plans.', 'epiphany', ['personal growth']], ['Sketch the settings screen on paper first.', 'idea', ['product design']], ['Ask Maya about the onboarding copy.', 'thought', ['launch']], ['Walk without headphones tomorrow.', 'idea', ['personal growth']], ['A photo book would make a good gift for Lena.', 'idea', []]]
+    },
+    zh: {
+      recs: [
+        { k: 'r1', d: 1, h: 20, dur: 48, raw: '主页一次只该显示一件事 而不是一长串列表 波形应该是主角 因为声音是原材料 主要按钮应该放在底部 就是拇指够得到的地方' },
+        { k: 'r2', d: 5, h: 9, dur: 35, raw: '没人愿意归档 所以应该按意思来整理而不是按文件夹 录音只是原材料 卡片才是成品' },
+        { k: 'r3', d: 2, h: 11, dur: 52, raw: '发布是三月十二号 测试版要在二月一号前准备好 定价页在二月十五号前 还要建好媒体名单 最大的风险是旧手机上的模型内存' }],
+      threads: [{ k: 'T1', t: '语音笔记 App：设计原则', b: '这个 App 该是什么样子、什么感觉，一个想法接一个想法。', d: 0, h: 8 }, { k: 'T2', t: '三月发布', b: '十二号之前必须完成的事。', d: 0, h: 7 }],
+      cards: [
+        { k: 'c1', r: 'r1', at: 0, t: '主页一次只显示一件事', b: '而不是一长串列表。', ty: 'idea', tg: ['产品设计'], th: 'T1' },
+        { k: 'c2', r: 'r1', at: 16, t: '波形应该是主角', b: '声音是原材料，所以应该最先看到它。', ty: 'idea', tg: ['产品设计', '美学'], th: 'T1' },
+        { k: 'c3', r: 'r1', at: 34, t: '主要按钮应该放在底部，拇指够得到的地方', b: '', ty: 'idea', tg: ['产品设计'], th: 'T1' },
+        { k: 'c4', r: 'r2', at: 0, t: '没人愿意归档', b: '应该按**意思**整理，而不是按文件夹。', ty: 'epiphany', tg: ['产品设计'], th: 'T1' },
+        { k: 'c5', r: 'r2', at: 20, t: '录音是原材料，卡片才是成品', b: '', ty: 'epiphany', tg: ['产品设计'], th: 'T1', l: ['c2'] },
+        { k: 'c6', r: 'r3', at: 0, t: '三月十二号发布', b: '- 测试版 **2 月 1 日** 前准备好\n- 定价页 **2 月 15 日** 前\n- 建好媒体名单', ty: 'project', tg: ['发布', '计划'], th: 'T2' },
+        { k: 'c7', r: 'r3', at: 30, t: '最大的风险是旧手机上的模型内存', b: '承诺之前先在最旧的 8 GB 手机上测试。', ty: 'question', tg: ['发布'], th: 'T2', l: ['c6'] },
+        { k: 'c8', d: 3, h: 22, t: '最好的界面是安静的', b: '没有任何东西和最重要的那件事争夺注意力。', ty: 'idea', tg: ['美学', '产品设计'] },
+        { k: 'c9', d: 7, h: 8, t: '“间”：留白也是设计的一部分', b: '日本的“间”认为空隙和物体一样有意义，把它用在间距上。', ty: 'idea', tg: ['美学'], l: ['c8'] }],
+      solos: [
+        { d: 8, ty: 'question', tg: ['定价', '商业'], t: '每月 9 美元对笔记 App 是不是太贵？' },
+        { d: 15, ty: 'idea', tg: ['定价'], t: '免费版也许只能存 20 张卡片' },
+        { d: 23, ty: 'idea', tg: ['定价', '商业'], t: '为笔记 App 付费的人要的是同步，不是 AI' },
+        { d: 30, ty: 'epiphany', tg: ['定价', '个人成长'], t: '我脑子里一直在改价格：先 5 美元，再 9 美元，然后免费', k: 'cp2', l: ['cp3'] },
+        { d: 41, ty: 'question', tg: ['定价'], t: '还没人用的时候就纠结定价，是不是方向错了？' },
+        { d: 52, ty: 'question', tg: ['定价', '商业'], t: '应该买断，而不是订阅吗？' },
+        { d: 60, ty: 'idea', tg: ['定价'], t: '定价这事又来了：问十个用户愿意付多少' },
+        { d: 4, ty: 'epiphany', tg: ['个人成长', '心理学'], t: '草稿没发出去，因为还不够完美' },
+        { d: 11, ty: 'idea', tg: ['心理学', '产品设计'], t: '落地页的标题我改了十一遍，只为追求完美' },
+        { d: 19, ty: 'epiphany', tg: ['个人成长', '心理学'], t: '等到完美再做，其实只是披着外衣的恐惧', k: 'cp3' },
+        { d: 27, ty: 'idea', tg: ['个人成长'], t: '先发不完美的版本，拿到反馈再改' },
+        { d: 38, ty: 'question', tg: ['心理学'], t: '为什么只有完美的时候我才觉得安全？' }],
+      pool: [['下周预约牙医。', 'thought', []], ['周日之前给爸爸打个电话。', 'thought', []], ['周末试试新开的拉面店。', 'thought', []], ['每隔一小时起来活动五分钟。', 'idea', ['健康']], ['把收藏的金缮那篇文章读完。', 'thought', ['美学']], ['睡前写十分钟日记。', 'idea', ['个人成长']], ['为什么我一早起来就先看手机？', 'question', ['心理学']], ['每天的小习惯比大计划累积得更快。', 'epiphany', ['个人成长']], ['设置页的草图先用纸画出来。', 'idea', ['产品设计']], ['问问 Maya 引导页的文案。', 'thought', ['发布']], ['明天不戴耳机散步。', 'idea', ['个人成长']], ['给 Lena 的礼物可以买一本摄影集。', 'idea', []]]
+    }
+  };
+  var PAT = [{ kw: { en: 'pric', zh: '定价' }, name: { en: 'pricing', zh: '定价' } }, { kw: { en: 'perfect', zh: '完美' }, name: { en: 'perfect', zh: '完美' } }];
+  var DEMO = {
+    zh: { words: ['呃', '明天', '下午', '三点', '和', 'Lena', '开会，', '讨论', '一下', 'onboarding', '的', '新流程。', '我觉得', '可以', '只问', '一个', '问题，', '然后', '把', 'pitch deck', '发给', '她。'], join: '', cards: [{ at: 0, title: '明天下午三点和 Lena 开会，讨论 onboarding 的新流程', body: '', ty: 'thought', tg: ['发布'], th: 'T2' }, { at: 8, title: 'onboarding 可以只问一个问题', body: '', ty: 'idea', tg: ['产品设计'], th: 'T1' }, { at: 14, title: '会后把 pitch deck 发给 Lena', body: '', ty: 'thought', tg: ['发布'], th: null }] },
+    en: { words: ['Um', 'tomorrow', 'at', 'three', 'I', 'meet', 'with', 'Lena,', 'to', 'go', 'over', 'the', 'new', 'onboarding', 'flow.', 'I', 'think', 'we', 'can', 'ask', 'just', 'one', 'question,', 'then', 'send', 'her', 'the', 'pitch', 'deck.'], join: ' ', cards: [{ at: 0, title: 'Meet Lena tomorrow at 3pm to go over the new onboarding flow', body: '', ty: 'thought', tg: ['launch'], th: 'T2' }, { at: 8, title: 'Onboarding could ask just one question', body: '', ty: 'idea', tg: ['product design'], th: 'T1' }, { at: 14, title: 'Send Lena the pitch deck afterwards', body: '', ty: 'thought', tg: ['launch'], th: null }] }
+  };
+  function defaultTypes() { return ['thought', 'idea', 'epiphany', 'question', 'project', 'thread'].map(function (id) { return { id: id, name: null }; }); }
+  var threadKeys = {};
+  function build(l) {
+    var sp = SPEC[l], today = sod(Date.now()), recs = [], cards = [], rid = 1, cid = 1, keyR = {}, keyC = {}, seedv = 20240611;
+    function rnd() { seedv = (seedv * 9301 + 49297) % 233280; return seedv / 233280; }
+    function tsOf(d, h, i) { return Math.min(today - d * DAY + h * 3600000, Date.now() - 600000 * (i + 1)); }
+    function mk(o) { var c = { id: cid++, rid: null, src: 'text', at: 0, title: '', body: '', type: 'thought', tags: [], thread: null, links: [], ts: Date.now() }; for (var k in o) c[k] = o[k]; cards.push(c); return c; }
+    sp.recs.forEach(function (b, i) { var r = { id: rid++, ts: tsOf(b.d, b.h, i), dur: b.dur, raw: b.raw, status: 'ready', src: 'voice' }; recs.push(r); keyR[b.k] = r; });
+    threadKeys = {}; sp.threads.forEach(function (th, i) { var c = mk({ title: th.t, body: md(th.b), type: 'thread', ts: tsOf(th.d, th.h, i + 20) }); keyC[th.k] = c; threadKeys[th.k] = c.id; });
+    sp.cards.forEach(function (s, i) { var r = s.r ? keyR[s.r] : null, c = mk({ rid: r ? r.id : null, src: r ? 'voice' : 'text', at: s.at || 0, title: s.t, body: md(s.b || ''), type: s.ty, tags: (s.tg || []).slice(), thread: s.th ? keyC[s.th].id : null, ts: r ? r.ts : tsOf(s.d, s.h, i + 30), _l: s.l }); if (s.k) keyC[s.k] = c; });
+    sp.solos.forEach(function (s, i) { var ts = tsOf(s.d, s.h || 10, i + 60), r = { id: rid++, ts: ts, dur: 8 + ((i * 7) % 20), raw: s.t.toLowerCase().replace(/[.,?!:，。？！]/g, ''), status: 'ready', src: 'voice' }; recs.push(r); var c = mk({ rid: r.id, src: 'voice', title: s.t, type: s.ty, tags: s.tg.slice(), ts: ts, _l: s.l }); if (s.k) keyC[s.k] = c; });
+    for (var d = 14; d <= 125; d++) { var boost = (Math.floor(d / 7) % 3 === 0) ? .18 : 0, r0 = rnd() - boost, n = r0 < .5 ? 0 : r0 < .78 ? 1 : r0 < .92 ? 2 : 3;
+      for (var k = 0; k < n; k++) { var pi = sp.pool[Math.floor(rnd() * sp.pool.length)], ts2 = today - d * DAY + (8 + Math.floor(rnd() * 14)) * 3600000 + k * 900000, rec = { id: rid++, ts: ts2, dur: 8 + Math.floor(rnd() * 30), raw: pi[0].replace(/[.,?!，。？！]/g, '').toLowerCase(), status: 'ready', src: 'voice' }; recs.push(rec); mk({ rid: rec.id, src: 'voice', title: pi[0], type: pi[1], tags: pi[2].slice(), ts: ts2 }); } }
+    cards.forEach(function (c) { if (c._l) { c.links = c._l.map(function (kk) { return keyC[kk] && keyC[kk].id; }).filter(Boolean); delete c._l; } });
+    return { recs: recs, cards: cards, nextRec: rid, nextCard: cid };
+  }
+
+  var S = build(lang), recs = S.recs, cards = S.cards, types = defaultTypes(), nextRec = S.nextRec + 100, nextCard = S.nextCard + 1000, nextType = 10;
+  var view = 'cards', filterSel = null, query = '', limit = 40, detail = null, editBody = false, dismissed = {}, named = {}, rv = null, modelState = 'installed', dlPct = 0, dlTimer = null;
+  var settings = { auto: 2.5, keep: 30 }, undoFn = null, toastTimer = null;
+  var calMonth = new Date(); calMonth.setDate(1); calMonth.setHours(0, 0, 0, 0); var calDay = dkey(Date.now());
+
+  function recById(id) { return recs.filter(function (r) { return r.id === id; })[0]; }
+  function cardById(id) { return cards.filter(function (c) { return c.id === id; })[0]; }
+  function live() { return cards.filter(function (c) { return !c.deleted && !c.archived; }); }
+  function typeById(id) { return types.filter(function (g) { return g.id === id; })[0]; }
+  function typeName(id) { var g = typeById(id); return !g ? id : g.name ? g.name : T[lang].types[id] || id; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function mmss(s) { s = Math.max(0, Math.round(s)); return pad2(Math.floor(s / 60)) + ':' + pad2(s % 60); }
+  function LOC() { return lang === 'zh' ? 'zh-CN' : 'en-US'; }
+  function cv(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  function rgba(hex, a) { hex = hex.replace('#', ''); if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join(''); var n = parseInt(hex, 16); return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')'; }
+  function hero(title, right) { return '<div class="hero"><h1>' + esc(title) + '</h1>' + (right || '') + '</div>'; }
+  function cap1(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  /* ---------- markdown (live) and [[card links]] ---------- */
+  function byTitle(tt) { tt = tt.trim().toLowerCase(); return cards.filter(function (c) { return !c.deleted && c.title.trim().toLowerCase() === tt; })[0]; }
+  function inline(s) {
+    s = esc(s); return s.replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>').replace(/~~([^~]+)~~/g, '<s>$1</s>').replace(/\+\+([^+]+)\+\+/g, '<u>$1</u>')
+      .replace(/\[\[([^\]]+)\]\]/g, function (_, x) { var c = byTitle(x.replace(/&amp;/g, '&')); return c ? '<a class="wl" data-cid="' + c.id + '">' + x + '</a>' : '<span class="wl miss">' + x + '</span>'; }).replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  }
+  function md(src) {
+    var out = [], list = null, para = [];
+    function fp() { if (para.length) { out.push('<p>' + inline(para.join(' ')) + '</p>'); para = []; } } function fl() { if (list) { out.push('</' + list + '>'); list = null; } }
+    String(src || '').split('\n').forEach(function (ln) { var m;
+      if (/^\s*$/.test(ln)) { fp(); fl(); return; }
+      if ((m = ln.match(/^(#{1,3})\s+(.*)$/))) { fp(); fl(); out.push('<h' + m[1].length + '>' + inline(m[2]) + '</h' + m[1].length + '>'); return; }
+      if ((m = ln.match(/^>\s?(.*)$/))) { fp(); fl(); out.push('<blockquote>' + inline(m[1]) + '</blockquote>'); return; }
+      if ((m = ln.match(/^\s*[-*]\s+(\[( |x)\]\s+)?(.*)$/))) { fp(); if (list !== 'ul') { fl(); out.push('<ul>'); list = 'ul'; } out.push('<li>' + (m[1] ? '<input type="checkbox" disabled' + (m[2] === 'x' ? ' checked' : '') + '>' : '') + inline(m[3]) + '</li>'); return; }
+      if ((m = ln.match(/^\s*\d+\.\s+(.*)$/))) { fp(); if (list !== 'ol') { fl(); out.push('<ol>'); list = 'ol'; } out.push('<li>' + inline(m[1]) + '</li>'); return; }
+      fl(); para.push(ln); });
+    fp(); fl(); return out.join('');
+  }
+  function textOf(h) { var d = document.createElement('div'); d.innerHTML = String(h || '').replace(/<\/(p|div|li|h3|h2|blockquote)>/g, '\n</$1>'); return d.textContent; }
+  function plain(s) { return textOf(s).replace(/\[\[([^\]]+)\]\]/g, '$1').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/[#>*`]/g, '').replace(/^\s*[-\d.]+\s+/gm, '').trim().replace(/\s*\n+\s*/g, ' · '); }
+
+  /* ---------- links: both directions ---------- */
+  function refsOut(c) { var ids = c.links.slice(), re = /\[\[([^\]]+)\]\]/g, m, re2 = /data-cid="(\d+)"/g; while ((m = re2.exec(c.body))) { var y = +m[1]; if (y !== c.id && ids.indexOf(y) < 0 && cardById(y)) ids.push(y); } while ((m = re.exec(c.body))) { var x = byTitle(m[1]); if (x && x.id !== c.id && ids.indexOf(x.id) < 0) ids.push(x.id); } return ids; }
+  function linksOf(c) {
+    var res = [], out = refsOut(c), inc = cards.filter(function (x) { return !x.deleted && x.id !== c.id && refsOut(x).indexOf(c.id) > -1; }).map(function (x) { return x.id; }), seen = {};
+    if (c.thread && cardById(c.thread) && !cardById(c.thread).deleted) res.push({ c: cardById(c.thread), kind: 'thread' });
+    if (c.rid) cards.filter(function (x) { return !x.deleted && x.rid === c.rid && x.id !== c.id; }).sort(function (a, b) { return a.at - b.at; }).forEach(function (x) { res.push({ c: x, kind: 'same' }); seen[x.id] = 1; });
+    out.concat(inc).forEach(function (id) { if (seen[id]) return; seen[id] = 1; var x = cardById(id); if (!x || x.deleted) return; var o = out.indexOf(id) > -1, i = inc.indexOf(id) > -1; res.push({ c: x, kind: o && i ? 'both' : o ? 'out' : 'in', explicit: c.links.indexOf(id) > -1 }); });
+    return res;
+  }
+
+  /* ---------- waveform ---------- */
+  function wave(r, n) {
+    if (r.levels) { var out = [], k = r.levels.length / n; for (var i = 0; i < n; i++) { var a = Math.floor(i * k), b = Math.max(a + 1, Math.floor((i + 1) * k)), m = 0; for (var j = a; j < b && j < r.levels.length; j++) m = Math.max(m, r.levels[j]); out.push(Math.max(.1, m)); } return out; }
+    var sv = r.id * 9301 + 49297, bars = []; function rnd() { sv = (sv * 9301 + 49297) % 233280; return sv / 233280; }
+    for (var q = 0; q < n; q++) { var env = .35 + .5 * Math.abs(Math.sin(q / n * 5.2 + r.id)) * (.6 + .4 * Math.sin(q / n * 11 + r.id * 2)); bars.push(Math.max(.1, Math.min(1, env * (.55 + rnd() * .5)))); }
+    return bars;
+  }
+  function drawWave(c0, bars, o) {
+    o = o || {}; var dpr = window.devicePixelRatio || 1, w = c0.clientWidth, h = c0.clientHeight; if (!w || !h) return;
+    c0.width = w * dpr; c0.height = h * dpr; var c = c0.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, w, h);
+    var step = 3, n = Math.floor(w / step), ink = cv('--ink'), mute = cv('--ink2'), acc = cv('--acc'), prog = o.progress == null ? -1 : o.progress;
+    function grad(col, a0, a1) { var g = c.createLinearGradient(0, h * .04, 0, h); g.addColorStop(0, rgba(col, a0)); g.addColorStop(1, rgba(col, a1)); return g; }
+    var gMute = grad(mute, 0, .85), gInk = grad(ink, 0.05, 1), gAcc = grad(acc, 0.05, 1);
+    for (var i = 0; i < n; i++) {
+      var pos = i / (n - 1) * (bars.length - 1), i0 = Math.floor(pos), i1 = Math.min(bars.length - 1, i0 + 1), f = (1 - Math.cos((pos - i0) * Math.PI)) / 2;
+      var v = bars[i0] * (1 - f) + bars[i1] * f, noise = .8 + .2 * Math.abs(Math.sin(i * 12.9898 + 7.1)); v = Math.min(1, v * noise); var bh = Math.max(3, v * h * .94);
+      c.fillStyle = o.live ? (i > n * .9 ? gAcc : gMute) : (prog >= 0 && i / n <= prog ? gInk : gMute); c.fillRect(i * step, h - bh, 1.6, bh);
+    }
+    c.globalCompositeOperation = 'destination-in'; var m = c.createLinearGradient(0, 0, w, 0); m.addColorStop(0, 'rgba(0,0,0,0)'); m.addColorStop(.1, 'rgba(0,0,0,1)'); m.addColorStop(.9, 'rgba(0,0,0,1)'); m.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = m; c.fillRect(0, 0, w, h); c.globalCompositeOperation = 'source-over';
+    if (o.marks) o.marks.forEach(function (mk) { c.fillStyle = rgba(acc, .55); c.fillRect(Math.round(mk * w), h - 18, 1, 18); });
+    if (prog >= 0) {
+      var px = Math.max(.5, Math.min(w - .5, prog * w)); c.fillStyle = acc;
+      if (o.mini) { c.fillRect(px - .5, 0, 1, h); return; }
+      c.fillRect(px - .5, 34, 1, h - 34);
+      var label = 'T ' + mmss(o.t || 0) + '  A ' + (bars[Math.min(bars.length - 1, Math.floor(prog * bars.length))] || 0).toFixed(2), tw = 112, bx = Math.max(6, Math.min(w - tw - 6, px - tw / 2));
+      c.fillStyle = ink; c.fillRect(bx, 12, tw, 20); c.fillStyle = cv('--bg'); c.font = '500 10.5px "IBM Plex Mono", monospace'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(label, bx + tw / 2, 22.5);
+    }
+  }
+
+  /* ---------- drawer + top bar ---------- */
+  var phone = $('#phone'), home = $('#home'), DRAW = 296, ds = null;
+  var BURGER = '<span class="burger"><i></i><i></i></span>', BACK = '<svg width="22" height="22" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>';
+  function openDrawer() { home.classList.remove('drag'); home.style.removeProperty('--d'); phone.classList.add('dopen'); }
+  function closeDrawer() { home.classList.remove('drag'); home.style.removeProperty('--d'); phone.classList.remove('dopen'); }
+  function isBack() { return view === 'filter' || view === 'archive' || view === 'search'; }
+  $('#menu').addEventListener('click', function () { if (isBack()) { setView(view === 'search' ? 'cards' : 'organize'); return; } phone.classList.contains('dopen') ? closeDrawer() : openDrawer(); });
+  $('#btnSearch').addEventListener('click', function () { query = ''; setView('search'); });
+  $('#shade').addEventListener('click', closeDrawer);
+  home.addEventListener('pointerdown', function (e) { var r = phone.getBoundingClientRect(), edge = e.clientX - r.left < 28, onRow = !!e.target.closest('.row'); ds = { x: e.clientX, y: e.clientY, ok: !onRow || edge || phone.classList.contains('dopen'), drag: false, open: phone.classList.contains('dopen') }; });
+  home.addEventListener('pointermove', function (e) {
+    if (!ds || !ds.ok) return; var dx = e.clientX - ds.x, dy = e.clientY - ds.y;
+    if (!ds.drag) { if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.3 && (ds.open ? dx < 0 : dx > 0)) { ds.drag = true; home.classList.add('drag'); try { home.setPointerCapture(e.pointerId); } catch (er) {} } else return; }
+    ds.p = Math.max(0, Math.min(1, ds.open ? 1 + dx / DRAW : dx / DRAW)); home.style.setProperty('--d', ds.p.toFixed(3));
+  });
+  function dend() { if (!ds) return; var s = ds; ds = null; if (!s.drag) return; (s.p > .4 ? openDrawer : closeDrawer)(); }
+  home.addEventListener('pointerup', dend); home.addEventListener('pointercancel', dend);
+  function renderDrawer() {
+    var pr = recs.filter(function (r) { return r.status === 'review' || r.status === 'processing'; }).length, items = [['cards', ''], ['organize', ''], ['cal', ''], ['recs', pr || ''], ['settings', '']];
+    $('#dnav').innerHTML = items.map(function (it) { return '<button class="ditem" data-v="' + it[0] + '" aria-current="' + (view === it[0] || ((view === 'filter' || view === 'archive') && it[0] === 'organize') || (view === 'search' && it[0] === 'cards')) + '" style="height:56px">' + t(it[0]) + '<span class="n">' + it[1] + '</span></button>'; }).join('');
+    $$('#dnav .ditem').forEach(function (b) { b.onclick = function () { closeDrawer(); setView(b.dataset.v); }; });
+    $('#dlang').innerHTML = '<button data-v="zh" aria-pressed="' + (lang === 'zh') + '">中文</button><button data-v="en" aria-pressed="' + (lang === 'en') + '">EN</button>';
+    $$('#dlang button').forEach(function (b) { b.onclick = function () { setLang(b.dataset.v); }; });
+  }
+  function setView(v) { view = v; $$('.view').forEach(function (n) { n.hidden = n.id !== 'v-' + v; }); $('#dock').classList.toggle('hide', v === 'settings' || v === 'search'); renderAll(); if (v === 'search') setTimeout(function () { var q = $('#sq'); if (q) q.focus(); }, 60); }
+  function renderTop() { document.documentElement.lang = lang === 'zh' ? 'zh-Hans' : 'en'; $('#menu').innerHTML = isBack() ? BACK : BURGER; $('#menu').setAttribute('aria-label', isBack() ? t('back') : 'Menu'); $('#btnSearch').style.visibility = view === 'cards' ? 'visible' : 'hidden'; $('#topLabel').textContent = (view === 'filter' || view === 'archive') ? '' : t(view); }
+  function renderAll() { renderTop(); renderDrawer(); renderCards(); renderOrganize(); renderFilter(); renderArchive(); renderCal(); renderRecs(); renderSearch(); renderSettings(); $('#dockType').textContent = t('dockPh'); $('#cta').innerHTML = t('recordB') + '<span class="rd"></span>'; }
+
+  /* ---------- cards: headline first, detail second, add-ons last ---------- */
+  function cardHTML(c) {
+    var n = c.type === 'thread' ? cards.filter(function (x) { return x.thread === c.id && !x.deleted && !x.archived; }).length : 0, tg = c.tags.slice(0, 2).map(function (x) { return '#' + esc(x); }).join(' ');
+    var det = c.type === 'thread' ? n + ' ' + t('cardsN') : plain(c.body);
+    return '<div class="row" data-id="' + c.id + '"><div class="bg"></div><button class="card" aria-label="' + esc(c.title) + '"><div class="ttl">' + esc(c.title) + '</div>' + (det ? '<div class="bod">' + esc(det) + '</div>' : '') + '<div class="meta mono"><span class="ty">' + esc(typeName(c.type)) + '</span><span class="tgs">' + tg + '</span>' + (c.archived ? '<span class="tgs" style="color:var(--ink3)">' + t('archived') + '</span>' : '') + '</div></button></div>';
+  }
+  function dayHead(k) { var p = k.split('-'), d = new Date(+p[0], +p[1] - 1, +p[2]); if (k === dkey(Date.now())) return t('today'); if (k === dkey(Date.now() - DAY)) return t('yday'); return d.toLocaleDateString(LOC(), { weekday: 'short', month: 'short', day: 'numeric' }); }
+  function feed(items, lim) {
+    var out = '', last = null, shown = 0;
+    for (var i = 0; i < items.length && shown < lim; i++, shown++) { var k = dkey(items[i].ts); if (k !== last) { if (last !== null) out += '</div>'; out += '<div class="dgroup mono"><span>' + esc(dayHead(k)) + '</span></div><div class="cards">'; last = k; } out += cardHTML(items[i]); }
+    return { html: out + (last !== null ? '</div>' : ''), more: items.length - shown };
+  }
+  var MAIN = { r: { label: 'archive', fn: function (c, row) { fade(row, function () { c.archived = true; }, t('archivedOk'), function () { c.archived = false; }); } }, l: { label: 'del', fn: function (c, row) { fade(row, function () { c.deleted = true; }, t('deleted'), function () { c.deleted = false; }); } } };
+  var ARCH = { r: { label: 'restore', fn: function (c, row) { fade(row, function () { c.archived = false; }, t('restored'), function () { c.archived = true; }); } }, l: MAIN.l };
+  function wire(sel, cfg) { $$(sel + ' .row').forEach(function (r) { var id = +r.dataset.id; attachSwipe(r, { r: cfg.r, l: cfg.l, id: id, tap: function () { openDetail('card', id); } }); }); }
+  function renderCards() {
+    var items = live().sort(function (a, b) { return b.ts - a.ts || a.at - b.at; }), h = hero(t('cards'));
+    if (!items.length) h += '<div class="empty">' + t('emptyCards') + '</div>'; else { var f = feed(items, limit); h += '<div class="feed">' + f.html + '</div>' + (f.more > 0 ? '<button class="more" id="more">' + t('older') + ' (' + f.more + ')</button>' : ''); }
+    $('#v-cards').innerHTML = h; var mo = $('#more'); if (mo) mo.onclick = function () { limit += 40; renderCards(); }; wire('#v-cards', MAIN);
+  }
+
+  /* ---------- organize: types and tags with counts (cards only) ---------- */
+  function tagCounts() { var m = {}; live().forEach(function (c) { c.tags.forEach(function (x) { m[x] = (m[x] || 0) + 1; }); }); return Object.keys(m).map(function (k) { return { id: k, n: m[k] }; }).sort(function (a, b) { return b.n - a.n || (a.id < b.id ? -1 : 1); }); }
+  function typeCounts() { return types.map(function (g) { return { id: g.id, n: live().filter(function (c) { return c.type === g.id; }).length }; }).filter(function (o) { return o.n > 0; }).sort(function (a, b) { return b.n - a.n; }); }
+  function staleCards() {
+    var ref = {}; cards.forEach(function (c) { if (!c.deleted) refsOut(c).forEach(function (id) { ref[id] = 1; }); }); var cut = Date.now() - 60 * DAY;
+    return live().filter(function (c) { return c.ts < cut && !ref[c.id] && !c.links.length && ['thread', 'project', 'problem'].indexOf(c.type) < 0 && !c.thread; });
+  }
+  function renderOrganize() {
+    var h = hero(t('organize')), st = staleCards(), ty = typeCounts(), tg = tagCounts(), arch = cards.filter(function (c) { return c.archived && !c.deleted; }).length;
+    if (st.length >= 8) h += '<div class="sugg"><span class="mono">' + t('archive') + '</span><p>' + t('staleMsg')(st.length) + '</p><div class="acts"><button class="btn solid" id="stale">' + t('archiveThem') + '</button></div></div>';
+    function rows(list, kind, label) { return list.map(function (o) { return '<div class="row" data-k="' + kind + '" data-id="' + esc(o.id) + '"><div class="bg"></div><button class="card orow"><span>' + (kind === 'tag' ? '#' : '') + esc(label(o.id)) + '</span><span class="ct">' + o.n + '</span></button></div>'; }).join(''); }
+    h += '<div class="sec"><h2 class="sech">' + t('typesSec') + '</h2></div>' + rows(ty, 'type', typeName) + '<div class="sec"><h2 class="sech">' + t('tagsSec') + '</h2></div>' + rows(tg, 'tag', function (x) { return x; });
+    h += '<div class="sec"></div><button class="orow" id="goarch" style="width:100%;color:var(--ink2)"><span>' + t('archivedRow') + '</span><span class="ct">' + arch + '</span></button>';
+    $('#v-organize').innerHTML = h;
+    $$('#v-organize .row').forEach(function (r) { var kind = r.dataset.k, id = r.dataset.id;
+      attachSwipe(r, { l: { label: 'archive', fn: function (_, row) { var ids = live().filter(function (c) { return kind === 'type' ? c.type === id : c.tags.indexOf(id) > -1; }).map(function (c) { return c.id; }); fade(row, function () { ids.forEach(function (i) { cardById(i).archived = true; }); }, t('archivedOk') + ' · ' + ids.length, function () { ids.forEach(function (i) { cardById(i).archived = false; }); }); } }, tap: function () { filterSel = { kind: kind, id: id }; setView('filter'); } }); });
+    $('#goarch').onclick = function () { setView('archive'); };
+    var sb = $('#stale'); if (sb) sb.onclick = function () { var ids = st.map(function (c) { return c.id; }); ids.forEach(function (i) { cardById(i).archived = true; }); renderAll(); toast(t('archivedOk') + ' · ' + ids.length, function () { ids.forEach(function (i) { cardById(i).archived = false; }); renderAll(); }); };
+  }
+  function renderFilter() {
+    if (view !== 'filter' || !filterSel) { $('#v-filter').innerHTML = ''; return; }
+    var f = filterSel, items = live().filter(function (c) { return f.kind === 'type' ? c.type === f.id : c.tags.indexOf(f.id) > -1; }).sort(function (a, b) { return b.ts - a.ts || a.at - b.at; });
+    $('#v-filter').innerHTML = hero((f.kind === 'tag' ? '#' : '') + (f.kind === 'type' ? typeName(f.id) : f.id)) + (items.length ? feed(items, 200).html : '<div class="empty">' + t('none') + '</div>'); wire('#v-filter', MAIN);
+  }
+  function renderArchive() {
+    if (view !== 'archive') { $('#v-archive').innerHTML = ''; return; }
+    var items = cards.filter(function (c) { return c.archived && !c.deleted; }).sort(function (a, b) { return b.ts - a.ts; });
+    $('#v-archive').innerHTML = hero(t('archivedRow')) + (items.length ? feed(items, 100).html : '<div class="empty">' + t('archiveEmpty') + '</div>'); wire('#v-archive', ARCH);
+  }
+
+  /* ---------- patterns: loops you may not see ---------- */
+  function patterns() {
+    var out = []; PAT.forEach(function (p) { if (named[p.name.en] || dismissed[p.name.en]) return; var kw = p.kw[lang];
+      var m = live().filter(function (c) { return c.type !== 'problem' && (c.title + ' ' + c.tags.join(' ')).toLowerCase().indexOf(kw) > -1; }).sort(function (a, b) { return b.ts - a.ts; });
+      var wk = {}; m.forEach(function (c) { wk[Math.floor(c.ts / (7 * DAY))] = 1; }); var w = Object.keys(wk).length; if (m.length >= 4 && w >= 3) out.push({ p: p, m: m, w: w }); });
+    return out;
+  }
+  function renderPatterns() {
+    var ps = patterns(), h = hero(t('patterns'));
+    h += ps.length ? ps.map(function (o, i) { var nm = o.p.name[lang]; return '<div class="pat"><span class="mono">' + t('loop') + '</span><h3>' + esc(t('loopTitle')(nm, o.m.length, o.w)) + '</h3>' + o.m.slice(0, 2).map(function (c) { return '<div class="ex">' + esc(c.title) + '</div>'; }).join('') + '<div class="note" style="padding:12px 0 0">' + t('loopQ') + '</div><div class="acts"><button class="btn solid" data-pn="' + i + '">' + t('nameProb') + '</button><button class="btn" data-pd="' + i + '">' + t('notLoop') + '</button></div></div>'; }).join('') : '<div class="empty">' + t('patEmpty') + '</div>';
+    $('#v-patterns').innerHTML = h;
+    $$('#v-patterns [data-pd]').forEach(function (b) { b.onclick = function () { dismissed[ps[+b.dataset.pd].p.name.en] = true; renderAll(); }; });
+    $$('#v-patterns [data-pn]').forEach(function (b) { b.onclick = function () { openProblem(ps[+b.dataset.pn]); }; });
+  }
+  function openProblem(o) {
+    var nm = o.p.name[lang]; $('#prob').innerHTML = '<h2><span class="mono">' + t('probTitle') + '</span><button class="btn solid" id="pbsave">' + t('save') + '</button></h2><div class="field"><textarea id="pbtx" placeholder="' + esc(t('probPh')) + '"></textarea></div>';
+    $('#pbsave').onclick = function () { var v = $('#pbtx').value.trim(); if (!v) return; var tagName = lang === 'zh' ? nm : cap1(nm) === 'Perfect' ? 'perfectionism' : nm, ids = o.m.map(function (c) { return c.id; });
+      o.m.forEach(function (c) { if (c.tags.indexOf(tagName) < 0) c.tags.push(tagName); }); cards.push({ id: nextCard++, rid: null, src: 'text', at: 0, title: v, body: '', type: 'problem', tags: [tagName], thread: null, links: ids, ts: Date.now() }); named[o.p.name.en] = true; closeSheets(); renderAll(); toast(t('probSaved')); };
+    openSheet('#prob'); setTimeout(function () { $('#pbtx').focus(); }, 300);
+  }
+
+  /* ---------- calendar: cards by day ---------- */
+  function lvl(c) { return c >= 4 ? 4 : c; }
+  function renderCal() {
+    var counts = {}; live().forEach(function (c) { var k = dkey(c.ts); counts[k] = (counts[k] || 0) + 1; });
+    var ws = lang === 'zh' ? 1 : 0, todayTs = sod(Date.now()), y = calMonth.getFullYear(), m = calMonth.getMonth(), loc = LOC(), dim = new Date(y, m + 1, 0).getDate(), first = new Date(y, m, 1), offset = (first.getDay() - ws + 7) % 7, cells = '', thisMonth = y === new Date().getFullYear() && m === new Date().getMonth();
+    for (var o = 0; o < offset; o++) cells += '<div class="day out"></div>';
+    for (var d = 1; d <= dim; d++) { var key = y + '-' + pad2(m + 1) + '-' + pad2(d), cnt = counts[key] || 0, fut = new Date(y, m, d).getTime() > todayTs; cells += '<button class="day h' + lvl(cnt) + (key === calDay ? ' sel' : '') + (key === dkey(todayTs) ? ' today' : '') + '" data-k="' + key + '"' + (fut ? ' disabled style="opacity:.3"' : '') + '><span>' + d + '</span></button>'; }
+    var wd = ''; for (var q = 0; q < 7; q++) wd += '<span>' + new Date(2024, 0, 7 + ((q + ws) % 7)).toLocaleDateString(loc, { weekday: 'narrow' }) + '</span>';
+    var h = hero(calMonth.toLocaleDateString(loc, { year: 'numeric', month: 'long' }), '<span class="arrows"><button id="cprev" aria-label="Previous month">‹</button><button id="cnext" aria-label="Next month"' + (thisMonth ? ' disabled style="opacity:.3"' : '') + '>›</button></span>') + '<div class="dow">' + wd + '</div><div class="grid7">' + cells + '</div>';
+    var di = live().filter(function (c) { return dkey(c.ts) === calDay; }).sort(function (a, b) { return b.ts - a.ts || a.at - b.at; }), dd = calDay.split('-'), dt = new Date(+dd[0], +dd[1] - 1, +dd[2]);
+    h += '<div class="dayhead"><b>' + dt.toLocaleDateString(loc, { weekday: 'long', month: 'long', day: 'numeric' }) + '</b></div>' + (di.length ? '<div class="cards">' + di.map(cardHTML).join('') + '</div>' : '');
+    var sc = $('#v-cal').scrollTop; $('#v-cal').innerHTML = h; $('#v-cal').scrollTop = sc;
+    $$('#v-cal .day:not(.out)').forEach(function (b) { b.onclick = function () { calDay = b.dataset.k; renderCal(); }; });
+    $('#cprev').onclick = function () { calMonth = new Date(y, m - 1, 1); renderCal(); }; $('#cnext').onclick = function () { calMonth = new Date(y, m + 1, 1); renderCal(); }; wire('#v-cal', MAIN);
+  }
+
+  /* ---------- recordings: raw material only (voice) ---------- */
+  function renderRecs() {
+    var items = recs.filter(function (r) { return r.src === 'voice' || r.status !== 'ready'; }).sort(function (a, b) { return b.ts - a.ts; }), h = hero(t('recs')), out = '', last = null, shown = 0;
+    for (var i = 0; i < items.length && shown < limit; i++, shown++) { var r = items[i], k = dkey(r.ts), n = cards.filter(function (c) { return c.rid === r.id && !c.deleted; }).length, need = r.status === 'review' || r.status === 'processing';
+      if (k !== last) { if (last !== null) out += '</div>'; out += '<div class="dgroup mono"><span>' + esc(dayHead(k)) + '</span></div><div class="cards">'; last = k; }
+      out += '<div class="row"><button class="card" data-rec="' + r.id + '"><div class="top"><div style="min-width:0"><div class="ttl">' + new Date(r.ts).toLocaleTimeString(LOC(), { hour: '2-digit', minute: '2-digit' }) + (r.src === 'text' ? ' · ' + t('note') : '') + '</div><div class="meta mono">' + (need ? '<span class="badge">' + t('needsReview') + '</span>' : n + ' ' + t('cardsN')) + '</div></div>' + (r.src === 'voice' ? '<span class="dur">' + mmss(r.dur) + '</span>' : '') + '</div></button></div>'; }
+    if (last !== null) out += '</div>';
+    $('#v-recs').innerHTML = h + out + (items.length > shown ? '<button class="more" id="morer">' + t('older') + '</button>' : '');
+    $$('#v-recs [data-rec]').forEach(function (b) { b.onclick = function () { var r = recById(+b.dataset.rec); if (r.status === 'review' || r.status === 'processing') openReview(r.id); else openDetail('rec', r.id); }; });
+    var mo = $('#morer'); if (mo) mo.onclick = function () { limit += 40; renderRecs(); };
+  }
+
+  /* ---------- search: everything, archived included (marked) ---------- */
+  function renderSearch() {
+    var v = $('#v-search'); if (!v.dataset.init) { v.innerHTML = '<div class="sbox2"><span class="mono">⌕</span><input id="sq" type="search" autocomplete="off"></div><div id="sres"></div>'; v.dataset.init = '1'; $('#sq').oninput = function () { query = this.value; fillSearch(); }; }
+    $('#sq').placeholder = t('searchPh'); fillSearch();
+  }
+  function fillSearch() {
+    var q = query.trim().toLowerCase(), res = $('#sres'); if (!q) { res.innerHTML = ''; return; }
+    var items = cards.filter(function (c) { return !c.deleted && (c.title + ' ' + textOf(c.body) + ' ' + c.tags.join(' ') + ' ' + typeName(c.type)).toLowerCase().indexOf(q) > -1; }).sort(function (a, b) { return (a.archived ? 1 : 0) - (b.archived ? 1 : 0) || b.ts - a.ts; });
+    res.innerHTML = items.length ? '<div class="cards" style="padding-top:8px">' + items.slice(0, 40).map(cardHTML).join('') + '</div>' : '<div class="empty">' + t('none') + '</div>'; wire('#sres', MAIN);
+  }
+
+  /* ---------- swipe: right = archive, left = delete ---------- */
+  function attachSwipe(row, cfg) {
+    var card = row.querySelector('.card'), bg = row.querySelector('.bg'), x0 = 0, y0 = 0, dx = 0, down = false, moved = false; if (!card || !bg) return;
+    row.addEventListener('pointerdown', function (e) { var r = phone.getBoundingClientRect(), skip = e.clientX - r.left < 28 || phone.classList.contains('dopen'); down = !skip; moved = false; dx = 0; x0 = e.clientX; y0 = e.clientY; });
+    row.addEventListener('pointermove', function (e) {
+      if (!down) return; dx = e.clientX - x0;
+      if (!moved && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(e.clientY - y0)) { moved = true; try { row.setPointerCapture(e.pointerId); } catch (er) {} }
+      if (!moved) return; var side = dx > 0 ? cfg.r : cfg.l; if (!side) { dx = 0; return; }
+      bg.textContent = t(side.label); row.dataset.dir = dx > 0 ? 'r' : 'l'; row.style.setProperty('--p', Math.min(1, Math.abs(dx) / 80)); card.style.transition = 'none'; card.style.transform = 'translateX(' + dx + 'px)';
+    });
+    function end(cancel) {
+      if (!down) return; down = false; card.style.transition = '';
+      if (cancel || !moved) { card.style.transform = ''; row.style.setProperty('--p', 0); if (!cancel && !moved && cfg.tap) cfg.tap(); return; }
+      var side = dx > 0 ? cfg.r : cfg.l; if (side && Math.abs(dx) > 90) { card.style.transform = 'translateX(' + (dx > 0 ? '' : '-') + '112%)'; side.fn(cfg.id ? cardById(cfg.id) : null, row); } else { card.style.transform = ''; row.style.setProperty('--p', 0); }
+    }
+    row.addEventListener('pointerup', function () { end(false); }); row.addEventListener('pointercancel', function () { end(true); });
+  }
+  function fade(row, apply, msg, undo) { row.style.maxHeight = row.offsetHeight + 'px'; row.getBoundingClientRect(); row.style.opacity = '0'; row.style.maxHeight = '0'; setTimeout(function () { apply(); renderAll(); }, 330); toast(msg, function () { undo(); renderAll(); }); }
+  function toast(msg, undo) { $('#toastMsg').textContent = msg; undoFn = undo || null; var b = $('#toastBtn'); b.textContent = undo ? t('undo') : ''; b.hidden = !undo; $('#toast').classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(function () { $('#toast').classList.remove('on'); }, 4200); }
+  $('#toastBtn').addEventListener('click', function () { if (undoFn) undoFn(); undoFn = null; $('#toast').classList.remove('on'); });
+
+  /* ---------- sheets ---------- */
+  var openId = null;
+  function openSheet(sel) { closeSheets(true); openId = sel; $(sel).classList.add('on'); $('#scrim').classList.add('on'); }
+  function closeSheets(k) { if (openId) $(openId).classList.remove('on'); openId = null; if (!k) $('#scrim').classList.remove('on'); }
+  $('#scrim').addEventListener('click', function () { var s = openId; closeSheets(); if (s === '#sort' || s === '#linkp') { renderAll(); if (detail) renderDetail(); if (rv) renderReview(); } });
+
+  /* sort sheet: type, tags, thread, in one place */
+  function threadCards() { return cards.filter(function (c) { return c.type === 'thread' && !c.deleted && !c.archived; }).sort(function (a, b) { return b.ts - a.ts; }); }
+  function openSort(obj, after) {
+    var adding = null;
+    function draw() {
+      var used = tagCounts().map(function (o) { return o.id; }); obj.tags.forEach(function (x) { if (used.indexOf(x) < 0) used.push(x); });
+      $('#sort').innerHTML = '<h2><span class="mono">' + t('sortT') + '</span><button class="btn solid" id="sdone">' + t('done') + '</button></h2>' +
+        '<div class="blk"><span class="mono">' + t('type') + '</span><div class="chips">' + types.filter(function (g) { return g.id !== 'thread'; }).map(function (g) { return '<button class="opt" data-ty="' + g.id + '" aria-pressed="' + (obj.type === g.id) + '">' + esc(typeName(g.id)) + '</button>'; }).join('') + (adding === 'type' ? '' : '<button class="opt" data-add="type" style="box-shadow:inset 0 0 0 1px var(--line);background:none">+ ' + t('newType') + '</button>') + '</div></div>' +
+        '<div class="blk"><span class="mono">' + t('tags') + '</span><div class="chips">' + used.slice(0, 14).map(function (x) { return '<button class="opt" data-tg="' + esc(x) + '" aria-pressed="' + (obj.tags.indexOf(x) > -1) + '">#' + esc(x) + '</button>'; }).join('') + (adding === 'tag' ? '' : '<button class="opt" data-add="tag" style="box-shadow:inset 0 0 0 1px var(--line);background:none">+ ' + t('newTag') + '</button>') + '</div></div>' +
+        '<div class="blk"><span class="mono">' + t('thread') + '</span><div class="chips">' + threadCards().slice(0, 6).map(function (c) { return '<button class="opt" data-th="' + c.id + '" aria-pressed="' + (obj.thread === c.id) + '">' + esc(c.title.length > 24 ? c.title.slice(0, 24) + '…' : c.title) + '</button>'; }).join('') + '<button class="opt" data-th="" aria-pressed="' + (!obj.thread) + '">' + t('noThread') + '</button>' + (adding === 'thread' ? '' : '<button class="opt" data-add="thread" style="box-shadow:inset 0 0 0 1px var(--line);background:none">+ ' + t('newThread') + '</button>') + '</div></div>' +
+        (adding ? '<div class="field"><input id="addn" placeholder="' + esc(t('name')) + '" maxlength="32"><button class="btn solid" id="adda">' + t('add') + '</button></div>' : '');
+      $('#sdone').onclick = function () { closeSheets(); renderAll(); if (detail) renderDetail(); if (rv) renderReview(); };
+      $$('#sort [data-ty]').forEach(function (b) { b.onclick = function () { obj.type = b.dataset.ty; obj.typeManual = true; if (after) after(); draw(); }; });
+      $$('#sort [data-tg]').forEach(function (b) { b.onclick = function () { var i = obj.tags.indexOf(b.dataset.tg); if (i > -1) obj.tags.splice(i, 1); else obj.tags.push(b.dataset.tg); if (after) after(); draw(); }; });
+      $$('#sort [data-th]').forEach(function (b) { b.onclick = function () { obj.thread = b.dataset.th ? +b.dataset.th : null; if (after) after(); draw(); }; });
+      $$('#sort [data-add]').forEach(function (b) { b.onclick = function () { adding = b.dataset.add; draw(); $('#addn').focus(); }; });
+      var aa = $('#adda'); if (aa) aa.onclick = function () { var nm = $('#addn').value.trim(); if (!nm) return;
+        if (adding === 'type') { var id = 'u' + (nextType++); types.push({ id: id, name: nm }); obj.type = id; } else if (adding === 'tag') { if (obj.tags.indexOf(nm) < 0) obj.tags.push(nm); } else { var tc = { id: nextCard++, rid: null, src: 'text', at: 0, title: nm, body: '', type: 'thread', tags: [], thread: null, links: [], ts: Date.now() }; cards.push(tc); obj.thread = tc.id; }
+        adding = null; if (after) after(); draw(); };
+    }
+    draw(); openSheet('#sort');
+  }
+
+  /* link picker */
+  function openLinkPicker(c, cb) {
+    function draw(q) { var items = cards.filter(function (x) { return !x.deleted && (!c || (x.id !== c.id && c.links.indexOf(x.id) < 0)) && (!q || (x.title + ' ' + x.tags.join(' ')).toLowerCase().indexOf(q.toLowerCase()) > -1); }).sort(function (a, b) { return b.ts - a.ts; }).slice(0, 12);
+      $('#lres').innerHTML = items.map(function (x) { return '<button class="lk" data-lid="' + x.id + '"><span class="k">' + esc(typeName(x.type)) + '</span><span>' + esc(x.title) + '</span></button>'; }).join('') || '<div class="note" style="padding:8px 0">' + t('none') + '</div>';
+      $$('#lres [data-lid]').forEach(function (b) { b.onclick = function () { var x = cardById(+b.dataset.lid); closeSheets(); if (cb) { cb(x); return; } c.links.push(x.id); renderDetail(); renderAll(); }; }); }
+    $('#linkp').innerHTML = '<h2><span class="mono">' + t('linkCard') + '</span></h2><div class="field" style="margin:0 0 6px"><input id="lq" placeholder="' + esc(t('search')) + '"></div><div id="lres"></div>'; $('#lq').oninput = function () { draw(this.value); }; draw(''); openSheet('#linkp');
+  }
+
+  /* ---------- review: split, then you check ---------- */
+  function endP(x) { return /[.!?。！？]$/.test(x) ? x : x + (lang === 'zh' ? '。' : '.'); }
+  function splitText(full) { var s = full.split(/(?<=[.!?。！？])\s*|\n+/).filter(Boolean); if (s.length < 2) s = full.split(/\s*[,，;；]\s*|\s+and\s+|\s+then\s+|然后/).filter(Boolean); return s; }
+  function wordsOf(s) { var cjk = /[一-鿿]/.test(s), out = {}; if (cjk) { var cs = s.replace(/[^一-鿿]/g, ''); for (var i = 0; i < cs.length - 1; i++) out[cs.substr(i, 2)] = 1; } else s.toLowerCase().split(/[^a-z0-9]+/).forEach(function (w) { if (w.length > 4) out[w] = 1; }); return out; }
+  function guessThread(text) {
+    var w = wordsOf(text), best = null, bs = 0; threadCards().forEach(function (g) { var tw = {}; cards.filter(function (c) { return c.thread === g.id && !c.deleted; }).forEach(function (c) { var ww = wordsOf(c.title + ' ' + c.body); for (var k in ww) tw[k] = 1; }); var sc = 0; for (var k in w) if (tw[k]) sc++; if (sc > bs) { bs = sc; best = g.id; } }); return bs >= 2 ? best : null;
+  }
+  function guessTags(text) { var low = text.toLowerCase(); return tagCounts().filter(function (o) { return low.indexOf(o.id.toLowerCase()) > -1; }).slice(0, 2).map(function (o) { return o.id; }); }
+  function proposeFromText(raw, dur) {
+    var parts = splitText(raw).slice(0, 4), n = parts.length; return parts.map(function (p, i) { p = p.replace(/^#+\s*/, '').trim(); p = p.charAt(0).toUpperCase() + p.slice(1); return { at: Math.round((dur || 0) * i / n), title: p.replace(/[.。]$/, ''), body: '', ty: /[?？]/.test(p) ? 'question' : 'idea', tg: guessTags(p), th: guessThread(p) }; });
+  }
+  function resolveTh(th) { return th && threadKeys[th] ? threadKeys[th] : (typeof th === 'number' ? th : null); }
+  function openReview(rid) {
+    var r = recById(rid); rv = { rid: rid, cards: (r.proposed || []).map(function (c) { return { title: c.title, body: c.body, at: c.at, type: c.ty, tags: (c.tg || []).slice(), thread: resolveTh(c.th) }; }) };
+    renderReview(); $('#review').classList.add('on'); $('#review').scrollTop = 0; closeDrawer();
+  }
+  function renderReview() {
+    if (!rv) return; var r = recById(rv.rid), busy = r.status === 'processing', n = rv.cards.length, voice = r.src === 'voice';
+    var h = '<div class="pad"><div class="tbar"><span class="mono" style="padding:16px 12px">' + t('review') + (voice ? '' : ' · ' + t('fromText')) + '</span><button class="btn" id="rvlater" style="margin:6px 12px 0 0">' + t('later') + '</button></div><div class="hero" style="padding-top:8px"><h1>' + (busy ? t('splitting') : n + ' ' + t('cardsN')) + '</h1>' + (voice ? '<span class="code">' + mmss(r.dur) + '</span>' : '') + '</div>';
+    if (busy) h += '<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
+    else { h += '<div class="note" style="padding:0 20px 14px">' + t('reviewSub') + '</div>' + rv.cards.map(function (c, i) { var th = c.thread ? cardById(c.thread) : null;
+      return '<div class="rvc" data-i="' + i + '"><div class="rvt" contenteditable="true" spellcheck="false" data-ph="' + esc(t('titlePh')) + '">' + esc(c.title) + '</div><div class="rvb" contenteditable="true" spellcheck="false" data-ph="' + esc(t('bodyPh')) + '">' + esc(c.body) + '</div><div class="rvf"><button class="chip2 sug" data-sort="1">' + esc(typeName(c.type)) + (c.tags.length ? ' · ' + c.tags.map(function (x) { return '#' + esc(x); }).join(' ') : '') + '</button>' + (th ? '<button class="chip2 none" data-sort="1">↳ ' + esc(th.title.length > 18 ? th.title.slice(0, 18) + '…' : th.title) + '</button>' : '') + '<span class="sp"></span>' + (i < n - 1 ? '<button class="act" data-merge="1">' + t('merge') + '</button>' : '') + '<button class="act" data-split="1">' + t('split') + '</button><button class="act" data-drop="1">' + t('drop') + '</button></div></div>'; }).join(''); }
+    h += '</div>' + (busy ? '' : '<div class="rvfoot"><button class="pill wide acc" id="rvsave">' + (n ? t('saveN') + ' ' + n + ' ' + t('cardsN') : t('keepOnly')) + '</button></div>');
+    var sc = $('#review').scrollTop; $('#review').innerHTML = h; $('#review').scrollTop = sc;
+    $('#rvlater').onclick = function () { r.status = busy ? 'processing' : 'review'; r.proposed = rv.cards.map(function (c) { return { at: c.at, title: c.title, body: c.body, ty: c.type, tg: c.tags, th: c.thread }; }); closeReview(); };
+    if (busy) return;
+    $$('#review .rvc').forEach(function (el) { var i = +el.dataset.i; el.querySelector('.rvt').oninput = function () { rv.cards[i].title = this.textContent; }; el.querySelector('.rvb').oninput = function () { rv.cards[i].body = this.textContent; };
+      $$$('[data-sort]', el).forEach(function (b) { b.onclick = function () { openSort(rv.cards[i], null); }; });
+      var mg = el.querySelector('[data-merge]'); if (mg) mg.onclick = function () { var a = rv.cards[i], b = rv.cards[i + 1]; a.body = [a.body, b.title, b.body].filter(Boolean).map(endP).join(lang === 'zh' ? '' : ' '); rv.cards.splice(i + 1, 1); renderReview(); };
+      el.querySelector('[data-split]').onclick = function () { var a = rv.cards[i], full = [endP(a.title), a.body].filter(Boolean).join(lang === 'zh' ? '' : ' '), p = splitText(full); if (p.length < 2) { toast(t('cantSplit')); return; } var mid = Math.ceil(p.length / 2), A = p.slice(0, mid), B = p.slice(mid), j = lang === 'zh' ? '' : ' ';
+        var c1 = { title: A[0].replace(/[.。]$/, ''), body: A.slice(1).join(j), at: a.at, type: a.type, tags: a.tags.slice(), thread: a.thread }, c2 = { title: B[0].replace(/[.。]$/, ''), body: B.slice(1).join(j), at: Math.min(Math.max(1, r.dur - 1), a.at + 6), type: a.type, tags: a.tags.slice(), thread: a.thread }; rv.cards.splice(i, 1, c1, c2); renderReview(); };
+      el.querySelector('[data-drop]').onclick = function () { rv.cards.splice(i, 1); renderReview(); }; });
+    $('#rvsave').onclick = saveReview;
+  }
+  function closeReview() { $('#review').classList.remove('on'); rv = null; renderAll(); }
+  function saveReview() {
+    var r = recById(rv.rid), n = 0; rv.cards.forEach(function (c) { if (!c.title.trim()) return; n++; cards.push({ id: nextCard++, rid: r.src === 'voice' ? r.id : null, src: r.src, at: c.at, title: c.title.trim(), body: c.body.trim() ? '<p>' + esc(c.body.trim()) + '</p>' : '', type: c.type, tags: c.tags.slice(), thread: c.thread, links: [], ts: r.ts }); });
+    if (r.src === 'text') recs.splice(recs.indexOf(r), 1); else { r.status = 'ready'; r.proposed = null; }
+    $('#review').classList.remove('on'); rv = null; setView('cards'); toast(n + ' ' + t('cardsN') + ' · ' + t('savedN'));
+  }
+
+  /* ---------- card page (headline → detail → add-ons → links → source) and recording page ---------- */
+  var pb = { t: 0, playing: false, timer: null };
+  function stopPlay() { clearInterval(pb.timer); pb.playing = false; }
+  function openDetail(type, id) { detail = { type: type, id: id }; editBody = false; stopPlay(); pb.t = type === 'card' ? cardById(id).at : 0; renderDetail(); $('#thought').classList.add('open'); $('#thought').scrollTop = 0; closeDrawer(); }
+  function closeDetail() { stopPlay(); $('#thought').classList.remove('open'); detail = null; renderAll(); }
+  function curRec() { if (!detail) return null; var c = detail.type === 'card' ? cardById(detail.id) : null; return detail.type === 'card' ? (c && c.rid ? recById(c.rid) : null) : recById(detail.id); }
+  function chunks(r) { var cs = cards.filter(function (c) { return !c.deleted && c.rid === r.id; }).sort(function (a, b) { return a.at - b.at; }), w = r.raw.split(' '), n = Math.max(1, cs.length), out = [], starts = cs.length ? cs.map(function (c) { return Math.round(c.at / r.dur * w.length); }) : [0];
+    for (var i = 0; i < n; i++) out.push({ at: cs[i] ? cs[i].at : 0, text: w.slice(starts[i], i + 1 < n ? Math.max(starts[i] + 1, starts[i + 1]) : w.length).join(' '), card: cs[i] }); return out; }
+  function drawPlayer() {
+    var r = curRec(), c0 = $('#pcv') || $('#scv'); if (!r || !c0) return; var big = c0.id === 'pcv';
+    drawWave(c0, wave(r, big ? 64 : 48), { progress: pb.t / r.dur, t: pb.t, mini: !big, marks: big ? cards.filter(function (c) { return !c.deleted && c.rid === r.id; }).map(function (c) { return c.at / r.dur; }) : null });
+    var tm = $('#ptime'); if (tm) tm.textContent = mmss(pb.t) + ' / ' + mmss(r.dur); var st = $('#pstate'); if (st) st.textContent = pb.playing ? t('playing') : t('paused'); var s2 = $('#stime'); if (s2) s2.textContent = mmss(pb.t) + ' / ' + mmss(r.dur);
+    var pl = $('#pplay'); if (pl) pl.innerHTML = pb.playing ? '<svg viewBox="0 0 20 20"><rect x="4" y="3" width="4" height="14"/><rect x="12" y="3" width="4" height="14"/></svg>' : '<svg viewBox="0 0 20 20"><path d="M5 3l12 7-12 7z"/></svg>';
+    $$('#thought .ln').forEach(function (b, i, all) { var at = +b.dataset.at, next = all[i + 1] ? +all[i + 1].dataset.at : 1e9; b.classList.toggle('on', pb.t >= at && pb.t < next && (pb.playing || pb.t > 0)); });
+  }
+  function togglePlay() { var r = curRec(); if (pb.playing) { stopPlay(); drawPlayer(); return; } if (pb.t >= r.dur - .05) pb.t = 0; pb.playing = true; pb.timer = setInterval(function () { pb.t += .1; if (pb.t >= r.dur) { pb.t = r.dur; stopPlay(); } drawPlayer(); }, 100); drawPlayer(); }
+  function seekTo(f) { var r = curRec(); pb.t = Math.max(0, Math.min(r.dur, f * r.dur)); drawPlayer(); }
+  var KIND = { thread: { zh: '主题线', en: 'Thread' }, same: { zh: '同一录音', en: 'Same rec.' }, out: { zh: '指向', en: 'Links to' }, in: { zh: '被引用', en: 'Linked from' }, both: { zh: '互相', en: 'Both ways' } };
+  function renderRecPage() {
+    if (!detail) return; var r = curRec(), h = '<div class="pad"><div class="tbar"><button class="iconbtn" id="tback" aria-label="' + t('back') + '"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><span></span></div><div class="tpad"><div class="cpanel">';
+    if (detail.type === 'card') {
+      var c = cardById(detail.id); if (!c) { closeDetail(); return; }
+      h += '<div class="hl" id="chl" contenteditable="true" spellcheck="false">' + esc(c.title) + '</div>';
+      h += editBody ? '<div class="editor"><textarea id="cbody" placeholder="' + esc(t('mdHint')) + '">' + esc(c.body) + '</textarea><div class="pv"><span class="mono">' + t('preview') + '</span><div class="md" id="cprev">' + md(c.body) + '</div></div><div style="margin-top:8px"><button class="btn solid" id="cdone">' + t('done') + '</button></div></div>' : (c.body ? '<div class="md" id="cmd" style="cursor:text;margin-bottom:12px">' + md(c.body) + '</div>' : '<div class="mdhint" id="cmd0">' + esc(t('mdHint')) + '</div>');
+      h += '<div class="addon"><button class="chip2" id="csort">' + esc(typeName(c.type)) + '</button>' + c.tags.map(function (x) { return '<button class="chip2 sug" data-sort2="1">#' + esc(x) + '</button>'; }).join('') + '</div>';
+      if (c.type === 'thread') { var ch = cards.filter(function (x) { return x.thread === c.id && !x.deleted && !x.archived; }).sort(function (a, b) { return a.ts - b.ts || a.at - b.at; });
+        h += '<div class="sec2"><span class="mono">' + t('chain') + ' · ' + ch.length + '</span>' + (ch.length > 12 ? '<div class="hint2">' + esc(t('chainLong')(ch.length)) + '<br><button class="btn solid" id="trim">' + t('archiveOlder') + '</button></div>' : '') + ch.map(function (x) { return '<button class="lk" data-cid="' + x.id + '"><span class="k">' + new Date(x.ts).toLocaleDateString(LOC(), { month: 'short', day: 'numeric' }) + '</span><span>' + esc(x.title) + '</span></button>'; }).join('') + '</div>'; }
+      var L = linksOf(c); h += '<div class="sec2"><span class="mono">' + t('links') + '</span>' + L.map(function (o) { return '<button class="lk" data-cid="' + o.c.id + '"><span class="k">' + KIND[o.kind][lang] + '</span><span>' + esc(o.c.title) + '</span>' + (o.explicit && (o.kind === 'out' || o.kind === 'both') ? '<span class="x" data-unlink="' + o.c.id + '" role="button" aria-label="' + t('del') + '">×</span>' : '') + '</button>'; }).join('') + '<button class="lk" id="addlink" style="color:var(--acc)"><span class="k"></span><span>+ ' + t('linkCard') + '</span></button></div>';
+      if (r) h += '<div class="srcbox"><button class="play" id="pplay" aria-label="' + t('play') + '"></button><canvas id="scv"></canvas></div><div class="srcmeta"><span class="mono" id="stime"></span><button class="btn" id="oprec" style="height:30px">' + t('openRec') + '</button></div>';
+      else h += '<div class="srcmeta" style="margin-top:20px"><span class="mono">' + t('typedOn') + ' · ' + new Date(c.ts).toLocaleDateString(LOC(), { month: 'short', day: 'numeric' }) + '</span></div>';
+      h += '<div class="foot2"><button class="btn" id="carch">' + (c.archived ? t('restore') : t('archive')) + '</button><button class="btn" id="cdel">' + t('del') + '</button></div>';
+    } else {
+      var cs = cards.filter(function (c) { return !c.deleted && c.rid === r.id; }).sort(function (a, b) { return a.at - b.at; });
+      h = '<div class="pad"><div class="tbar"><button class="iconbtn" id="tback" aria-label="' + t('back') + '"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><span></span></div><div class="tpad"><div class="wavecard pl"><canvas id="pcv"></canvas><div class="wtop"><span class="stat"><i></i><span id="pstate"></span></span><span class="tchip" id="ptime"></span></div><button class="play" id="pplay" aria-label="' + t('play') + '"></button></div><div class="panel"><div class="mono" style="margin-bottom:6px">' + t('transcript') + '</div>' +
+        chunks(r).map(function (s) { return '<button class="ln" data-at="' + s.at + '"><span class="ts"><i></i>' + mmss(s.at) + '</span><p>' + esc(s.text) + '</p></button>'; }).join('') + '<div class="mono" style="margin:22px 0 4px">' + t('cardsFrom') + '</div>' + (cs.length ? cs.map(function (c) { return '<button class="cardrow" data-cid="' + c.id + '">' + esc(c.title) + '</button>'; }).join('') : '<div class="note" style="padding:6px 0">' + t('noCards') + '</div>');
+    }
+    $('#thought').innerHTML = h + '</div></div></div>';
+    $('#tback').onclick = closeDetail; var pp = $('#pplay'); if (pp) pp.onclick = togglePlay;
+    var c0 = $('#pcv') || $('#scv'); if (c0) { var drag = false; function pos(e) { var rr = c0.getBoundingClientRect(); seekTo((e.clientX - rr.left) / rr.width); } c0.addEventListener('pointerdown', function (e) { drag = true; c0.setPointerCapture(e.pointerId); pos(e); }); c0.addEventListener('pointermove', function (e) { if (drag) pos(e); }); c0.addEventListener('pointerup', function () { drag = false; }); }
+    $$('#thought .ln').forEach(function (b) { b.onclick = function () { pb.t = +b.dataset.at; drawPlayer(); }; });
+    $$('#thought [data-cid]').forEach(function (b) { b.onclick = function (e) { if (e.target.closest('[data-unlink]')) return; openDetail('card', +b.dataset.cid); }; });
+    if (detail.type === 'card') { var c2 = cardById(detail.id), hl = $('#chl'); hl.oninput = function () { c2.title = this.textContent; }; hl.onblur = function () { c2.title = this.textContent.trim() || c2.title; }; hl.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); this.blur(); } };
+      var ce = $('#cmd') || $('#cmd0'); if (ce) ce.onclick = function (e) { if (e.target.closest('[data-cid], a')) return; editBody = true; renderDetail(); setTimeout(function () { var tx = $('#cbody'); if (tx) tx.focus(); }, 50); };
+      var tb = $('#cbody'); if (tb) tb.oninput = function () { c2.body = this.value; $('#cprev').innerHTML = md(this.value); }; var cd = $('#cdone'); if (cd) cd.onclick = function () { editBody = false; renderDetail(); };
+      $$('#thought .md [data-cid]').forEach(function (a) { a.onclick = function () { openDetail('card', +a.dataset.cid); }; });
+      $('#csort').onclick = function () { openSort(c2, null); }; $$('#thought [data-sort2]').forEach(function (b) { b.onclick = function () { openSort(c2, null); }; });
+      $('#addlink').onclick = function () { openLinkPicker(c2); }; $$('#thought [data-unlink]').forEach(function (x) { x.onclick = function (e) { e.stopPropagation(); c2.links = c2.links.filter(function (i) { return i !== +x.dataset.unlink; }); renderDetail(); }; });
+      var op = $('#oprec'); if (op) op.onclick = function () { openDetail('rec', c2.rid); };
+      var tr = $('#trim'); if (tr) tr.onclick = function () { var ch = cards.filter(function (x) { return x.thread === c2.id && !x.deleted && !x.archived; }).sort(function (a, b) { return a.ts - b.ts; }), old = ch.slice(0, ch.length - 10).map(function (x) { return x.id; }); old.forEach(function (i) { cardById(i).archived = true; }); renderDetail(); renderAll(); toast(t('archivedOk') + ' · ' + old.length, function () { old.forEach(function (i) { cardById(i).archived = false; }); renderDetail(); renderAll(); }); };
+      $('#carch').onclick = function () { var was = c2.archived; c2.archived = !was; closeDetail(); toast(was ? t('restored') : t('archivedOk'), function () { c2.archived = was; renderAll(); }); };
+      $('#cdel').onclick = function () { c2.deleted = true; closeDetail(); toast(t('deleted'), function () { c2.deleted = false; renderAll(); }); }; }
+    requestAnimationFrame(drawPlayer);
+  }
+
+  /* ---------- card page: headline, type + tags, the note (most of the screen); then thread, same recording, links, recording as separate sections ---------- */
+  var secOpen = {}, lastEd = null, lastRange = null, suppressBlur = false;
+  var BACKSVG = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>';
+  function accSec(id, label, summary, inner) {
+    var on = !!secOpen[id];
+    return '<div class="acc' + (on ? ' on' : '') + '"><button class="acch" data-acc="' + id + '" aria-expanded="' + on + '"><span class="al">' + label + '</span><span class="as">' + summary + '</span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' + (on ? '<div class="accb">' + inner + '</div>' : '') + '</div>';
+  }
+  function renderDetail() {
+    if (!detail) return; if (detail.type === 'rec') { renderRecPage(); return; }
+    var c = cardById(detail.id); if (!c || c.deleted) { closeDetail(); return; } var r = curRec();
+    var h = '<div class="pad"><div class="tbar"><button class="iconbtn" id="tback" aria-label="' + t('back') + '">' + BACKSVG + '</button><button class="iconbtn" id="tmore" aria-label="' + t('more') + '"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button></div><div class="tpad" style="padding:6px 20px 0">';
+    h += '<div class="hl" id="chl" contenteditable="true" spellcheck="false">' + esc(c.title) + '</div>';
+    h += '<div class="cmeta"><button class="pillt ty" data-meta="1">' + esc(typeName(c.type)) + '</button>' + c.tags.map(function (x) { return '<button class="pillt" data-meta="1">#' + esc(x) + '</button>'; }).join('') + '<button class="pillt add" data-meta="1" aria-label="' + t('editMeta') + '">+</button></div>';
+    h += '<div class="rte' + (c.type === 'thread' ? ' short' : '') + '" id="cbody" contenteditable="true" spellcheck="false" data-ph="' + esc(t('notePh')) + '">' + c.body + '</div>';
+    if (c.type === 'thread') {
+      var ch = cards.filter(function (x) { return x.thread === c.id && !x.deleted && !x.archived; }).sort(function (a, b) { return a.ts - b.ts || a.at - b.at; });
+      h += '<div class="chain2"><div class="dgroup" style="padding:18px 0 6px"><span>' + t('chain') + ' · ' + ch.length + '</span></div>' + (ch.length > 12 ? '<div class="hint2">' + esc(t('chainLong')(ch.length)) + '<br><button class="btn solid" id="trim">' + t('archiveOlder') + '</button></div>' : '') + ch.map(function (x) { return '<button class="lk" data-cid="' + x.id + '"><span class="k">' + new Date(x.ts).toLocaleDateString(LOC(), { month: 'short', day: 'numeric' }) + '</span><span>' + esc(x.title) + '</span></button>'; }).join('') + '</div>';
+    }
+    h += '<div class="secondary">';
+    var th = c.thread ? cardById(c.thread) : null;
+    if (th && !th.deleted) h += accSec('thread', t('thisThread'), esc(th.title), '<button class="lk" data-cid="' + th.id + '"><span>' + esc(th.title) + '</span></button>');
+    var sibs = c.rid ? cards.filter(function (x) { return !x.deleted && x.rid === c.rid && x.id !== c.id; }).sort(function (a, b) { return a.at - b.at; }) : [];
+    if (sibs.length) h += accSec('same', t('sameRec'), sibs.length + ' ' + t('cardsN'), sibs.map(function (x) { return '<button class="lk" data-cid="' + x.id + '"><span class="k">' + mmss(x.at) + '</span><span>' + esc(x.title) + '</span></button>'; }).join(''));
+    var L = linksOf(c).filter(function (o) { return o.kind !== 'thread' && o.kind !== 'same'; });
+    h += accSec('links', t('links'), L.length ? String(L.length) : '—', L.map(function (o) { return '<button class="lk" data-cid="' + o.c.id + '"><span class="k">' + KIND[o.kind][lang] + '</span><span>' + esc(o.c.title) + '</span>' + (o.explicit && (o.kind === 'out' || o.kind === 'both') ? '<span class="x" data-unlink="' + o.c.id + '" role="button" aria-label="' + t('del') + '">×</span>' : '') + '</button>'; }).join('') + '<button class="lk" id="addlink" style="color:var(--acc)"><span>+ ' + t('linkCard') + '</span></button>');
+    if (r) h += accSec('rec', t('recording'), mmss(r.dur) + ' · ' + new Date(r.ts).toLocaleDateString(LOC(), { month: 'short', day: 'numeric' }), '<div class="srcbox"><button class="play" id="pplay" aria-label="' + t('play') + '"></button><canvas id="scv"></canvas></div><div class="srcmeta"><span id="stime" style="font-size:12px;color:var(--ink3)"></span><button class="btn" id="oprec">' + t('openRec') + '</button></div>');
+    else h += '<div class="typednote">' + t('typedOn') + ' · ' + new Date(c.ts).toLocaleDateString(LOC(), { year: 'numeric', month: 'short', day: 'numeric' }) + '</div>';
+    h += '</div></div></div>';
+    $('#thought').innerHTML = h;
+    $('#tback').onclick = closeDetail; $('#tmore').onclick = function () { openMore(c); };
+    var pp = $('#pplay'); if (pp) pp.onclick = togglePlay;
+    var c0 = $('#scv'); if (c0) { var drag = false; var pos = function (e) { var rr = c0.getBoundingClientRect(); seekTo((e.clientX - rr.left) / rr.width); }; c0.addEventListener('pointerdown', function (e) { drag = true; c0.setPointerCapture(e.pointerId); pos(e); }); c0.addEventListener('pointermove', function (e) { if (drag) pos(e); }); c0.addEventListener('pointerup', function () { drag = false; }); }
+    $$('#thought .secondary [data-cid], #thought .chain2 [data-cid]').forEach(function (b) { b.onclick = function (e) { if (e.target.closest('[data-unlink]')) return; openDetail('card', +b.dataset.cid); }; });
+    $$('#thought [data-acc]').forEach(function (b) { b.onclick = function () { secOpen[b.dataset.acc] = !secOpen[b.dataset.acc]; renderDetail(); }; });
+    $$('#thought [data-meta]').forEach(function (b) { b.onclick = function () { openSort(c, null); }; });
+    var al = $('#addlink'); if (al) al.onclick = function () { openLinkPicker(c); };
+    $$('#thought [data-unlink]').forEach(function (x) { x.onclick = function (e) { e.stopPropagation(); c.links = c.links.filter(function (i) { return i !== +x.dataset.unlink; }); renderDetail(); }; });
+    var op = $('#oprec'); if (op) op.onclick = function () { openDetail('rec', c.rid); };
+    var tr = $('#trim'); if (tr) tr.onclick = function () { var ch2 = cards.filter(function (x) { return x.thread === c.id && !x.deleted && !x.archived; }).sort(function (a, b) { return a.ts - b.ts; }), old = ch2.slice(0, ch2.length - 10).map(function (x) { return x.id; }); old.forEach(function (i) { cardById(i).archived = true; }); renderDetail(); renderAll(); toast(t('archivedOk') + ' · ' + old.length, function () { old.forEach(function (i) { cardById(i).archived = false; }); renderDetail(); renderAll(); }); };
+    var hl = $('#chl'); hl.oninput = function () { c.title = this.textContent; }; hl.onblur = function () { c.title = this.textContent.trim() || c.title; this.textContent = c.title; }; hl.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('#cbody').focus(); } };
+    wireEditor($('#cbody'), function (ed) { c.body = clean(ed.innerHTML); });
+    requestAnimationFrame(drawPlayer);
+  }
+  function openMore(c) {
+    $('#cardmenu').innerHTML = '<button class="shl" id="mm1">' + t('editMeta') + '</button><button class="shl" id="mm2">' + (c.archived ? t('restore') : t('archive')) + '</button><button class="shl danger" id="mm3">' + t('del') + '</button>';
+    $('#mm1').onclick = function () { openSort(c, null); };
+    $('#mm2').onclick = function () { closeSheets(); var was = c.archived; c.archived = !was; closeDetail(); toast(was ? t('restored') : t('archivedOk'), function () { c.archived = was; renderAll(); }); };
+    $('#mm3').onclick = function () { closeSheets(); c.deleted = true; closeDetail(); toast(t('deleted'), function () { c.deleted = false; renderAll(); }); };
+    openSheet('#cardmenu');
+  }
+
+  /* ---------- live rich-text editing: formatting toolbar + markdown shortcuts ---------- */
+  var ALLOW = { B: 1, STRONG: 1, I: 1, EM: 1, U: 1, S: 1, STRIKE: 1, H2: 1, H3: 1, UL: 1, OL: 1, LI: 1, BLOCKQUOTE: 1, P: 1, DIV: 1, BR: 1, A: 1, INPUT: 1, CODE: 1 };
+  function clean(html) {
+    var d = document.createElement('div'); d.innerHTML = html;
+    (function walk(n) { Array.prototype.slice.call(n.childNodes).forEach(function (ch) {
+      if (ch.nodeType === 1) {
+        if (!ALLOW[ch.tagName]) { walk(ch); while (ch.firstChild) n.insertBefore(ch.firstChild, ch); n.removeChild(ch); return; }
+        if (ch.tagName === 'INPUT' && ch.getAttribute('type') !== 'checkbox') { n.removeChild(ch); return; }
+        Array.prototype.slice.call(ch.attributes).forEach(function (a) { var keep = (ch.tagName === 'A' && /^(class|data-cid|contenteditable)$/.test(a.name)) || (ch.tagName === 'INPUT' && /^(type|checked)$/.test(a.name)); if (!keep) ch.removeAttribute(a.name); });
+        walk(ch);
+        if ((ch.tagName === 'P' || ch.tagName === 'DIV') && ch.querySelector('ul,ol,h3,h2,blockquote,p,div')) { while (ch.firstChild) n.insertBefore(ch.firstChild, ch); n.removeChild(ch); }
+      } else if (ch.nodeType !== 3) n.removeChild(ch); }); })(d);
+    return d.innerHTML.replace(/\u200b/g, '');
+  }
+  var MDB = [['bold', '<b>B</b>'], ['italic', '<i style="font-family:Georgia,serif">I</i>'], ['underline', '<u>U</u>'], ['strikeThrough', '<s>S</s>'], ['|'], ['h', 'H'], ['insertUnorderedList', '<svg viewBox="0 0 24 24"><circle cx="5" cy="7" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="5" cy="17" r="1"/><path d="M9 7h11M9 12h11M9 17h11"/></svg>'], ['insertOrderedList', '<svg viewBox="0 0 24 24"><path d="M4 5h1.5v4M4 9h3M4 14.5c0-1 .8-1.5 1.5-1.5s1.5.5 1.5 1.3c0 1.2-3 1.6-3 3.2h3M10 7h10M10 12h10M10 17h10"/></svg>'], ['cb', '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12l3 3 5-6"/></svg>'], ['q', '<svg viewBox="0 0 24 24"><path d="M6 6v12M10 9h9M10 13h9M10 17h6"/></svg>'], ['|'], ['lk', '<span style="font:700 14px var(--sans)">[[ ]]</span>']];
+  function renderBar() {
+    var lab = { bold: 'Bold', italic: 'Italic', underline: 'Underline', strikeThrough: 'Strikethrough', h: 'Heading', insertUnorderedList: 'Bullet list', insertOrderedList: 'Numbered list', cb: 'Checkbox', q: 'Quote', lk: 'Link a card' };
+    $('#mdbar').innerHTML = MDB.map(function (b) { return b[0] === '|' ? '<span class="sep"></span>' : '<button data-md="' + b[0] + '" aria-label="' + lab[b[0]] + '" tabindex="-1">' + b[1] + '</button>'; }).join('');
+    $$('#mdbar button').forEach(function (b) { b.addEventListener('mousedown', function (e) { e.preventDefault(); }); b.onclick = function () { mdCmd(b.dataset.md); }; });
+  }
+  function blockTag() { var n = getSelection().anchorNode; while (n && n.nodeType !== 1) n = n.parentNode; var b = n && n.closest ? n.closest('h3,blockquote,li,p,div') : null; return b ? b.tagName : ''; }
+  function restoreSel(ed) { if (document.activeElement === ed) return; ed.focus(); if (lastRange && ed.contains(lastRange.startContainer)) { var s = getSelection(); s.removeAllRanges(); s.addRange(lastRange); } }
+  function insertLink(x) { document.execCommand('insertHTML', false, '<a class="wl" data-cid="' + x.id + '" contenteditable="false">' + esc(x.title) + '</a>&nbsp;'); }
+  function mdCmd(k) {
+    var ed = lastEd; if (!ed || !document.contains(ed)) return; restoreSel(ed);
+    if (k === 'h') document.execCommand('formatBlock', false, blockTag() === 'H3' ? '<p>' : '<h3>');
+    else if (k === 'q') document.execCommand('formatBlock', false, blockTag() === 'BLOCKQUOTE' ? '<p>' : '<blockquote>');
+    else if (k === 'cb') document.execCommand('insertHTML', false, '<input type="checkbox">&nbsp;');
+    else if (k === 'lk') {
+      if (ed.id !== 'cbody') { document.execCommand('insertText', false, '[['); return; }
+      var range = lastRange ? lastRange.cloneRange() : null; suppressBlur = true;
+      openLinkPicker(detail ? cardById(detail.id) : null, function (x) { suppressBlur = false; var e2 = $('#cbody'); if (!e2) return; e2.focus(); if (range && e2.contains(range.startContainer)) { var s = getSelection(); s.removeAllRanges(); s.addRange(range); } else { var rg = document.createRange(); rg.selectNodeContents(e2); rg.collapse(false); var s2 = getSelection(); s2.removeAllRanges(); s2.addRange(rg); } insertLink(x); e2.dispatchEvent(new Event('input')); });
+      return;
+    }
+    else document.execCommand(k);
+    ed.dispatchEvent(new Event('input'));
+  }
+  function backDel(n) { var s = getSelection(); for (var i = 0; i < n; i++) s.modify('extend', 'backward', 'character'); document.execCommand('delete'); }
+  function wrapInline(n, tag, txt) { backDel(n); document.execCommand('insertHTML', false, '<' + tag + '>' + esc(txt) + '</' + tag + '>&#8203;'); }
+  function mdShortcut(ed, ch) {
+    var s = getSelection(); if (!s.rangeCount) return; var node = s.anchorNode, off = s.anchorOffset; if (!node || node.nodeType !== 3) return;
+    var before = node.textContent.slice(0, off).replace(/\u00a0/g, ' '), m;
+    if (ch === ' ') {
+      var el = node.parentNode, blk = el.closest ? el.closest('p,div,h3,li,blockquote') : null; if (!blk || !ed.contains(blk)) blk = ed;
+      var r0 = document.createRange(); r0.setStart(blk, 0); r0.setEnd(node, off); var bt = r0.toString().replace(/\u00a0/g, ' ');
+      if (/^[-*] $/.test(bt)) { backDel(2); document.execCommand('insertUnorderedList'); }
+      else if (/^1[.)] $/.test(bt)) { backDel(3); document.execCommand('insertOrderedList'); }
+      else if (/^#{1,3} $/.test(bt)) { backDel(bt.length); document.execCommand('formatBlock', false, '<h3>'); }
+      else if (/^> $/.test(bt)) { backDel(2); document.execCommand('formatBlock', false, '<blockquote>'); }
+      else if (/^\[ ?\] $/.test(bt)) { backDel(bt.length); document.execCommand('insertHTML', false, '<input type="checkbox">&nbsp;'); }
+      return;
+    }
+    if (ch === '*' && (m = before.match(/\*\*([^*]+)\*\*$/))) wrapInline(m[0].length, 'b', m[1]);
+    else if (ch === '*' && (m = before.match(/(?:^|[^*])\*([^*\s][^*]*)\*$/))) wrapInline(m[1].length + 2, 'i', m[1]);
+    else if (ch === '~' && (m = before.match(/~~([^~]+)~~$/))) wrapInline(m[0].length, 's', m[1]);
+    else if (ch === '+' && (m = before.match(/\+\+([^+]+)\+\+$/))) wrapInline(m[0].length, 'u', m[1]);
+    else if (ch === ']' && (m = before.match(/\[\[([^\]]+)\]\]$/))) { var x = byTitle(m[1]); if (x && ed.id === 'cbody') { backDel(m[0].length); insertLink(x); } }
+  }
+  function wireEditor(ed, onChange) {
+    ed.addEventListener('input', function (e) { if (e.inputType === 'insertText' && e.data) mdShortcut(ed, e.data); if (onChange) onChange(ed); });
+    ed.addEventListener('click', function (e) {
+      var cb = e.target.closest && e.target.closest('input[type=checkbox]'); if (cb) { if (cb.checked) cb.setAttribute('checked', ''); else cb.removeAttribute('checked'); if (onChange) onChange(ed); return; }
+      var a = e.target.closest && e.target.closest('.wl'); if (a && a.dataset.cid) { e.preventDefault(); openDetail('card', +a.dataset.cid); }
+    });
+    ed.addEventListener('paste', function (e) { var tx = (e.clipboardData || window.clipboardData).getData('text/plain'); if (tx) { e.preventDefault(); document.execCommand('insertText', false, tx); } });
+  }
+  document.addEventListener('selectionchange', function () { var s = getSelection(); if (!s.rangeCount) return; var n = s.anchorNode, el = n && (n.nodeType === 1 ? n : n.parentNode), ed = el && el.closest && el.closest('.rte'); if (ed) { lastEd = ed; lastRange = s.getRangeAt(0).cloneRange(); } });
+  document.addEventListener('focusin', function (e) { var tg = e.target; if (tg.classList && tg.classList.contains('rte')) { lastEd = tg; $('#mdbar').classList.add('on'); $('#typed').classList.toggle('withbar', tg.id === 'typedtx'); } });
+  document.addEventListener('focusout', function (e) { var tg = e.target; if (!(tg.classList && tg.classList.contains('rte'))) return;
+    setTimeout(function () { var a = document.activeElement; if (a && a.classList && a.classList.contains('rte')) return; $('#mdbar').classList.remove('on'); $('#typed').classList.remove('withbar');
+      if (tg.id === 'cbody' && detail && !suppressBlur && !(a && (a.isContentEditable || a.tagName === 'INPUT' || a.tagName === 'TEXTAREA'))) renderDetail(); }, 220); });
+  try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (e) {}
+  /* keep the formatting bar on top of the on-screen keyboard (iOS) */
+  if (window.visualViewport) { var vvFix = function () { var vv = window.visualViewport, kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop); $('#mdbar').style.bottom = kb + 'px'; }; visualViewport.addEventListener('resize', vvFix); visualViewport.addEventListener('scroll', vvFix); }
+
+  window.addEventListener('resize', function () { drawPlayer(); });
+
+  /* ---------- settings ---------- */
+  function setLang(l) { if (l === lang) return; lang = l; wr('lang3', lang); S = build(lang); recs = S.recs; cards = S.cards; types = defaultTypes(); filterSel = null; query = ''; dismissed = {}; named = {}; if (detail) closeDetail(); if (view === 'filter' || view === 'archive') view = 'organize'; setView(view); toast(t('langSwitched')); }
+  function renderSettings() {
+    var s = settings, mdl = modelState === 'installed' ? '<span class="mono">' + t('installed') + '</span><button class="btn" id="mdel">' + t('delM') + '</button>' : modelState === 'downloading' ? '<span class="mono">' + Math.round(dlPct) + '%</span>' : '<button class="btn solid" id="mdl">' + t('dl') + '</button>';
+    function seg(id, o, v) { return '<span class="seg" id="' + id + '">' + o.map(function (p) { return '<button data-v="' + p[0] + '" aria-pressed="' + (v === p[0]) + '">' + p[1] + '</button>'; }).join('') + '</span>'; }
+    var h = hero(t('settings'));
+    h += '<div class="sg"><div class="srow"><span>' + t('sLang') + '</span>' + seg('plang', [['zh', '中文'], ['en', 'English']], lang) + '</div></div>';
+    h += '<div class="sg"><div class="srow"><span>' + t('sLook') + '</span>' + seg('ptheme', [['auto', t('system')], ['light', t('light')], ['dark', t('dark')]], theme) + '</div></div>';
+    h += '<div class="sg"><span class="mono">' + t('sRec') + '</span><div class="srow"><span>' + t('autostop') + '</span><span class="step"><button id="sm" aria-label="-">−</button><b>' + s.auto.toFixed(1) + t('secs') + '</b><button id="sp" aria-label="+">+</button></span></div><div class="srow"><span>' + t('keepAudio') + '</span>' + seg('skeep', [[0, t('off')], [7, '7' + t('d')], [30, '30' + t('d')], [90, '90' + t('d')]], s.keep) + '</div></div>';
+    h += '<div class="sg"><span class="mono">' + t('sAI') + '</span><div class="srow"><span>' + t('modelRow') + '</span><span style="display:flex;gap:12px;align-items:center">' + mdl + '</span></div>' + (modelState === 'downloading' ? '<div class="bar" style="margin:0 20px"><i style="width:' + dlPct + '%"></i></div>' : '') + '</div>';
+    h += '<div class="sg"><span class="mono">' + t('sProto') + '</span><div class="srow"><span>' + t('actionBtn') + '</span><button class="btn solid" id="pact">▶</button></div><div class="srow"><span>' + t('reset') + '</span><button class="btn" id="preset">↺</button></div></div>';
+    $('#v-settings').innerHTML = h;
+    $('#sm').onclick = function () { s.auto = Math.max(1, s.auto - .5); renderSettings(); }; $('#sp').onclick = function () { s.auto = Math.min(6, s.auto + .5); renderSettings(); };
+    $$('#skeep button').forEach(function (b) { b.onclick = function () { s.keep = +b.dataset.v; renderSettings(); }; });
+    $$('#plang button').forEach(function (b) { b.onclick = function () { setLang(b.dataset.v); }; });
+    $$('#ptheme button').forEach(function (b) { b.onclick = function () { theme = b.dataset.v; wr('theme3', theme); applyTheme(); renderSettings(); drawPlayer(); }; });
+    var d = $('#mdl'); if (d) d.onclick = startDownload; var rr = $('#mdel'); if (rr) rr.onclick = function () { clearInterval(dlTimer); modelState = 'none'; renderSettings(); };
+    $('#pact').onclick = function () { setView('cards'); setTimeout(startCapture, 150); };
+    $('#preset').onclick = function () { S = build(lang); recs = S.recs; cards = S.cards; types = defaultTypes(); modelState = 'installed'; filterSel = null; query = ''; limit = 40; dismissed = {}; named = {}; calDay = dkey(Date.now()); if (detail) closeDetail(); setView('cards'); };
+  }
+  function startDownload() {
+    if (modelState === 'downloading') return; modelState = 'downloading'; dlPct = 0; renderSettings();
+    dlTimer = setInterval(function () { dlPct += 4 + Math.random() * 5; if (dlPct >= 100) { clearInterval(dlTimer); modelState = 'installed'; recs.filter(function (r) { return r.status === 'waiting'; }).forEach(splitRecording); renderAll(); return; } $$('.bar i').forEach(function (i) { i.style.width = dlPct + '%'; }); }, 220);
+  }
+
+  /* ---------- splitting (simulated). Voice: automatic. Typed text: only if you ask. ---------- */
+  function splitRecording(r) {
+    r.status = 'processing';
+    setTimeout(function () { r.proposed = r.demo ? DEMO[lang].cards.map(function (c) { return { at: c.at, title: c.title, body: c.body, ty: c.ty, tg: c.tg.slice(), th: c.th }; }) : proposeFromText(r.raw, r.dur); r.status = 'review'; if (rv && rv.rid === r.id) openReview(r.id); else renderAll(); }, 1800);
+  }
+  function addRecording(raw, demo, dur, levels, src) {
+    var r = { id: nextRec++, ts: Date.now(), dur: Math.max(4, Math.round(dur || 0)), raw: raw, levels: levels, demo: demo, src: src || 'voice', status: modelState === 'installed' ? 'processing' : 'waiting' };
+    recs.unshift(r); if (modelState === 'installed') splitRecording(r); return r;
+  }
+  function blocksOf(html) { var d = document.createElement('div'); d.innerHTML = clean(html); var out = []; Array.prototype.slice.call(d.childNodes).forEach(function (n) { if (n.nodeType === 1 && (n.tagName === 'UL' || n.tagName === 'OL')) Array.prototype.slice.call(n.children).forEach(function (li) { out.push({ text: li.textContent.trim(), html: '<ul><li>' + li.innerHTML + '</li></ul>' }); }); else { var tx = (n.textContent || '').trim(); if (tx) out.push({ text: tx, html: n.nodeType === 1 ? n.outerHTML : '<p>' + esc(tx) + '</p>' }); } }); return out; }
+  function saveTypedText(html) {
+    var bl = blocksOf(html); if (!bl.length) return; closeSheets();
+    $('#ask').innerHTML = '<h2><span class="mono">' + t('askT') + '</span></h2><button class="bigopt pri" id="asplit">' + t('askSplit') + '<small>' + t('askSplitS') + '</small></button><button class="bigopt" id="aone">' + t('askOne') + '<small>' + t('askOneS') + '</small></button>';
+    $('#asplit').onclick = function () { closeSheets(); var r = addRecording(bl.map(function (b) { return b.text; }).join('\n'), false, 0, null, 'text'); setView('cards'); openReview(r.id); };
+    $('#aone').onclick = function () { closeSheets(); var head = bl[0].text, rest = bl.slice(1).map(function (b) { return b.html; }).join(''); if (head.length > 90) { rest = '<p>' + esc(head.slice(90)) + '</p>' + rest; head = head.slice(0, 90); }
+      var all = bl.map(function (b) { return b.text; }).join(' ');
+      cards.push({ id: nextCard++, rid: null, src: 'text', at: 0, title: head, body: rest, type: /[?？]/.test(head) ? 'question' : 'idea', tags: guessTags(all), thread: guessThread(all), links: [], ts: Date.now() }); setView('cards'); toast(t('savedN')); };
+    openSheet('#ask');
+  }
+
+  /* ---------- capture ---------- */
+  var cap = null, raf = 0;
+  function drawLive() { var L = cap.levels.slice(-90), bars = []; for (var i = 0; i < 90; i++) { var idx = i - (90 - L.length); bars.push(idx >= 0 ? L[idx] : .06); } drawWave($('#livecv'), bars, { live: true }); }
+  function drawLines() {
+    var per = 6, lines = []; for (var i = 0; i < cap.words.length; i += per) lines.push({ at: Math.round(i / per * 2.3), text: cap.words.slice(i, i + per).join(cap.dm.join) });
+    var shown = lines.slice(-3); $('#tx').innerHTML = shown.map(function (l, i) { var age = shown.length - 1 - i; return '<div class="ln" style="opacity:' + (age === 0 ? 1 : age === 1 ? .55 : .3) + ';padding:8px 0"><span class="ts"><i></i>' + mmss(l.at) + '</span><p>' + esc(l.text) + '</p></div>'; }).join('');
+  }
+  function startCapture() {
+    if (cap) return; closeSheets(); closeDrawer(); if (detail) closeDetail();
+    cap = { i: 0, words: [], speaking: true, t0: performance.now(), stopped: false, levels: [], last: 0, dm: DEMO[lang] };
+    $('#capture').classList.add('on'); $('#cd').style.transition = 'none'; $('#cd').style.transform = 'scaleX(0)'; $('#cstat').textContent = t('listening'); $('#ctitle').textContent = t('capTitle');
+    $('#tx').innerHTML = ''; $('#btnStop').innerHTML = t('stopB') + '<span class="sq"></span>';
+    cap.timer = setInterval(function () { if (cap.i < cap.dm.words.length) { cap.words.push(cap.dm.words[cap.i++]); drawLines(); } else { clearInterval(cap.timer); cap.speaking = false; beginSilence(); } }, 230);
+    (function loop() { if (!cap) return; var now = performance.now(), s = (now - cap.t0) / 1000, lv = cap.speaking ? .3 + .6 * Math.abs(Math.sin(s * 5.3)) * (.55 + .45 * Math.sin(s * 2.1)) : .04 + .03 * Math.random();
+      if (now - cap.last > 60) { cap.levels.push(lv); cap.last = now; drawLive(); } $('#clock').textContent = mmss(s); raf = requestAnimationFrame(loop); })();
+  }
+  function beginSilence() { $('#cstat').textContent = t('quiet'); var cd = $('#cd'); cd.style.transition = 'none'; cd.style.transform = 'scaleX(0)'; cd.getBoundingClientRect(); cd.style.transition = 'transform ' + settings.auto + 's linear'; cd.style.transform = 'scaleX(1)'; cap.auto = setTimeout(stopCapture, settings.auto * 1000); }
+  function stopCapture() {
+    if (!cap || cap.stopped) return; cap.stopped = true; clearInterval(cap.timer); clearTimeout(cap.auto); cancelAnimationFrame(raf); $('#cstat').textContent = t('saving');
+    var raw = cap.words.join(' ').replace(/[，。,.]/g, '').replace(/\s+/g, ' ').trim(), dur = (performance.now() - cap.t0) / 1000, lv = cap.levels.slice();
+    var r = addRecording(raw, true, dur, lv, 'voice'); cap = null; $('#capture').classList.remove('on'); setView('cards'); openReview(r.id);
+  }
+  $('#cta').addEventListener('click', startCapture); $('#btnStop').addEventListener('click', stopCapture);
+  $('#dockType').addEventListener('click', function () { $('#typedtx').innerHTML = ''; $('#typedT').textContent = t('typeTitle'); $('#saveTyped').textContent = t('save'); openSheet('#typed'); setTimeout(function () { $('#typedtx').focus(); }, 300); });
+  $('#saveTyped').addEventListener('click', function () { saveTypedText($('#typedtx').innerHTML); });
+
+  /* tiny helper: querySelectorAll scoped to an element */
+  function $$$(sel, el) { return Array.prototype.slice.call(el.querySelectorAll(sel)); }
+  renderBar(); wireEditor($('#typedtx'), null);
+  renderAll();
+  if (location.hash === '#capture') setTimeout(startCapture, 200);
+})();
+</script>
+</body></html>
